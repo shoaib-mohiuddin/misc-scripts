@@ -1,0 +1,338 @@
+---
+x-conductor-tools:
+  apply-in-pipeline: true
+  sfx-org-name: cr-client-oiaglobal
+
+  secrets:
+    signalfx-token: true
+
+format: estate/0.1.0
+
+organization:
+  name: OIA Global
+secret storage:
+  type: aws_secrets_manager
+solution sources:
+- name: aws
+  version: ^0.x
+- name: automated_patching
+  bucket: conductor-solutions-908ec29e
+  version: ^2.0
+- name: chef
+  version: ^0.x
+- name: operations-api-access
+  bucket: conductor-solutions-908ec29e
+  version: ^2.0
+- name: onboarding_compliance
+  version: ^0.x
+- name: signalfx
+  version: ^0.x
+- name: aws-backups
+  version: ^0.x
+- name: automated-onboarding
+  bucket: conductor-solutions-908ec29e
+  version: ^0.x
+
+solution runtimes:
+  CR-Opsdev:
+    target:
+      iam_role_arn: arn:aws:iam::830657588137:role/ConductorSolutionRuntimeRole
+      region: eu-west-1
+      s3_bucket_name: cr-opsdev-lambda-function-code
+    solutions:
+    - aws
+    - chef
+    - onboarding_compliance
+    - signalfx
+    - operations-api-access
+    - aws-backups
+    - automated_patching
+    - automated-onboarding
+resource providers:
+  cr-client-oiaglobal:
+    type: signalfx.organization
+    data:
+      realm: eu0
+    credentials:
+      signalfx.discovery:
+        type: reference
+        source: OIAGLOBAL_SIGNALFX_CREDENTIALS  # This comes from a file on your local machine
+        format: json
+  OIA-Global:
+    target:
+      iam_role_arn: arn:aws:iam::271725455000:role/ConductorResourceProvider
+      region: eu-west-1
+    type: aws.account
+    data:
+      AccountId: '271725455000'
+      Shortcode: 'OIA Global (OIAP)'
+  OIA-Connect:
+    target:
+      iam_role_arn: arn:aws:iam::679870666530:role/ConductorResourceProvider
+      region: eu-west-1
+    type: aws.account
+    data:
+      AccountId: '679870666530'
+      Shortcode: 'OIA Connect (OIAC)'
+  chef:
+    credentials:
+      chef.discovery:
+        type: reference
+        source: CHEF_CREDENTIALS
+        format: json
+      automated-onboarding.check-onboarded:
+        type: reference
+        format: json
+        source: CHEF_CREDENTIALS
+    type: chef.account
+    data:
+      user: cr-service-user
+root policies:
+  aws.discovery:
+    regions:
+    - 'eu-west-1'
+    resource_types: '*'
+  chef.discovery:
+    chef_server: https://base.chef.cloudreach.com/
+    organizations:
+    - cloudreach-oiaglobal
+    blacklist_filters:
+    - default
+    - automatic.dmi
+    - automatic.idletime
+    - automatic.idletime_seconds
+    - automatic.memory
+    - automatic.root_group
+    - automatic.shells
+    - automatic.cloud_v2
+    - automatic.fips
+    - automatic.filesystem2
+    - automatic.uptime_seconds
+    - automatic.cpu
+    - automatic.uptime
+    - automatic.packages
+    - automatic.sysconf
+    - automatic.etc
+    - automatic.keys
+    - automatic.cloud
+    - automatic.fqdn
+  signalfx.discovery:
+    integrations:
+    - AWS
+    - Smart Agent
+  aws-backups.backup-application:
+    enabled: true
+  aws-backups.backup-report:
+    enabled: true
+  automated_patching.patch_reporting:
+    enabled: true
+  automated-onboarding.check-onboarded:
+    log-level: INFO
+resource groups:
+  AWS-Onboarding-:
+    query: 'resource_type: aws.ec2.instance AND State.Name: "running"'
+    children:
+      OIAGlobal-Onboarding:
+        query: 'AccountId:"271725455000" AND (Tags.[]:{"Key": "CloudreachSupport", "Value": "BaseSupport"})'
+        policies:
+          automated-onboarding.automated-onboarding:
+            log_level: INFO
+            chef:
+              organisation_name: cloudreach-oiaglobal
+              short_code: OIAP
+              environment: oia-prod
+              runlist:
+              - role[meta-base]
+              install_version: '15'
+      OIAConnect-Onboarding:
+        query: 'AccountId:"679870666530" AND (Tags.[]:{"Key": "Customer", "Value": "OIAGlobal"})'
+        policies:
+          automated-onboarding.automated-onboarding:
+            log_level: INFO
+            chef:
+              organisation_name: cloudreach-oiaglobal
+              short_code: OIAC
+              environment: oia-cr-connect
+              runlist:
+              - role[meta-base-no-al]
+              install_version: '15'
+  AWS Backup Solution OIA-global bellville_eu:
+    query: 'resource_type: aws.ec2.instance AND (Tags.[]:{"Key": "Cloudreach Backup
+      Group", "Value": "bellville_eu"} AND NOT Tags.[]:{"Key": "Cloudreach Backup
+      Ignore", "Value": "True"}) AND AccountId:"271725455000"'
+    policies:
+      aws-backups.backup-configuration:
+        bellville_eu_backup:
+          rules:
+            Monthly:
+              schedule: 0 0 10 * ? *   # 00:00 AM on the 10th Day of every Month
+              retention_days: 60
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Weekly:
+              schedule: 00 01 ? * 1 *   # 1:00 AM on every monday of week
+              retention_days: 21
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Daily:
+              schedule: 0 2 ? * * *   # 2:00 AM on everyday
+              retention_days: 7
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+  AWS Backup Solution OIA-global bellville_eu_monthly_3:
+    query: 'resource_type: aws.ec2.instance AND (Tags.[]:{"Key": "Cloudreach Backup
+      Group", "Value": "bellville_eu_monthly_3"} AND NOT Tags.[]:{"Key": "Cloudreach
+      Backup Ignore", "Value": "True"}) AND AccountId:"271725455000"'
+    policies:
+      aws-backups.backup-configuration:
+        bellville_eu_monthly_3_backup:
+          rules:
+            Yearly:
+              schedule: 00 03 31 12 ? *   # 03:00 AM on 31st Day of 12th Month every year
+              retention_days: 365
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Monthly:
+              schedule: 0 0 10 * ? *   # 00:00 AM on the 10th Day of every Month
+              retention_days: 90
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Weekly:
+              schedule: 00 01 ? * 1 *   # 1:00 AM on every monday of week
+              retention_days: 21
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Daily:
+              schedule: 0 2 ? * * *   # 2:00 AM on everyday
+              retention_days: 7
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+  AWS Backup Solution OIA-global bellville_eu_monthly_6:
+    query: 'resource_type: aws.ec2.instance AND (Tags.[]:{"Key": "Cloudreach Backup
+      Group", "Value": "bellville_eu_monthly_6"} AND NOT Tags.[]:{"Key": "Cloudreach
+      Backup Ignore", "Value": "True"}) AND AccountId:"271725455000"'
+    policies:
+      aws-backups.backup-configuration:
+        bellville_eu_monthly_6_backup:
+          rules:
+            Yearly:
+              schedule: 00 03 31 12 ? *   # 03:00 AM on 31st Day of 12th Month every year
+              retention_days: 365
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Monthly:
+              schedule: 0 0 10 * ? *   # 00:00 AM on the 10th Day of every Month
+              retention_days: 180
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Weekly:
+              schedule: 00 01 ? * 1 *   # 1:00 AM on every monday of week
+              retention_days: 21
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Daily:
+              schedule: 0 2 ? * * *   # 2:00 AM on everyday
+              retention_days: 7
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+  OIAGLOBAL compliance:
+    query: 'resource_type: aws.ec2.instance'
+    policies:
+      onboarding_compliance.ssm_compliance:
+        check-ssm: true
+      onboarding_compliance.relation_compliance:
+        chef-checkin-within-hours: 24
+        signalfx-integrations: [AWS, Smart Agent]
+        check-alert-logic: true
+  Chef Nodes:
+    query: resource_type:chef.node
+  Discovered AWS Accounts:
+    query: resource_type:aws.account
+    children:
+      Bellvillerodair:
+        query: AccountId:"271725455000"
+      OIA-Connect:
+        query: AccountId:"679870666530"
+  OIA Patching:
+    query: '(resource_type: core.resource_group AND display_id: "OIA Patching") OR
+      (Tags.[]:{"Key": "Cloudreach Patching Event", "Value": "Production"} AND NOT
+      Tags.[]:{"Key": "Cloudreach Patching Ignore", "Value": "True"})'
+    policies:
+      automated_patching.scheduling:
+        rfc_id: CHG0057509
+        schedule: 0 18 25 11 ? 2023
+        check_iam_policies: false
+  CR Ops Conductor API Vault Setup:
+    query: CROpsConductorAPIVaultSetup
+    policies:
+      operations-api-access.setup:
+        vault:
+          organisation: oia
+roles:
+  Administrators:
+    policy: admin
+    idp_groups:
+    - Cloud Developers
+    - Operations Tier 2
+    - Operations Tier 3 - Edinburgh
+    - Operations Tier 3 - Vancouver
+    - Operations Tier 3 - Pune
+    - PE-Gen
+  ReadOnly:
+    policy: readonly
+    idp_groups:
+    - devsecops group
+    - Operations Tier 1
+    - Service Delivery
+    - Service Transition
+notifications:
+  filters:
+    snow-events:
+      query: 'notification_type: event'
+      endpoints:
+      - conductor-servicenow-events-eu-west-1
+    pagerduty-alerts:
+      query: 'notification_type: compliance'
+      endpoints:
+      - pagerduty-alerts-eu-west-1
+  endpoints:
+    conductor-servicenow-events-eu-west-1:
+      type: aws-sqs
+      configuration:
+        queue_arn: arn:aws:sqs:eu-west-1:830657588137:conductor-snow-events-prod
+      credentials:
+        iam_role_arn: arn:aws:iam::830657588137:role/cloudreach/conductor/conductor-snow-events-eu-west-1-prod-conductor-notify-cust02
+    pagerduty-alerts-eu-west-1:
+      type: aws-sqs
+      configuration:
+        queue_arn: arn:aws:sqs:eu-west-1:830657588137:pagerduty-alerts-prod-conductor
+      credentials:
+        iam_role_arn: arn:aws:iam::830657588137:role/cloudreach/conductor/pagerduty-alerts-eu-west-1-prod-conductor-notify-customers02
+    pagerduty-alerts-eu-central-1:
+      type: aws-sqs
+      configuration:
+        queue_arn: arn:aws:sqs:eu-central-1:830657588137:pagerduty-alerts-prod-conductor
+      credentials:
+        iam_role_arn: arn:aws:iam::830657588137:role/cloudreach/conductor/pagerduty-alerts-eu-central-1-prod-conductor-notify-customers02

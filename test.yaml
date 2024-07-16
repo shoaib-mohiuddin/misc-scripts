@@ -1,0 +1,20 @@
+detectors:
+  default_aws_rds_high_memory:
+    template: aws/rds/high_memory.yaml.j2
+    rules:
+      - name: "RDS freeable memory less than 20% for last 5m"
+        duration: 5m
+        threshold: 20 #percent
+        # clear_duration:
+        # clear_threshold:
+        severity: Critical
+
+  default_aws_rds_db_connection_count:
+    template: aws/rds/database_connection_count.yaml.j2
+    rules:
+      - name: "RDS connection count exceeds 50 for last 5m"
+        duration: 5m
+        threshold: 50
+        # clear_duration:
+        # clear_threshold:
+        severity: Critical

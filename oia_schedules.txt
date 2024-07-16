@@ -1,0 +1,146 @@
+# Backups and Patching Schedules for OIA accounts 271725455000 and 679870666530
+
+AWS-Onboarding-:
+    query: 'resource_type: aws.ec2.instance AND State.Name: "running"'
+    children:
+      OIAGlobal-Onboarding:
+        query: 'AccountId:"271725455000" AND (Tags.[]:{"Key": "CloudreachSupport", "Value": "BaseSupport"})'
+        policies:
+          automated-onboarding.automated-onboarding:
+            log_level: INFO
+            chef:
+              organisation_name: cloudreach-oiaglobal
+              short_code: OIAP
+              environment: oia-prod
+              runlist:
+              - role[meta-base]
+              install_version: '15'
+      OIAConnect-Onboarding:
+        query: 'AccountId:"679870666530" AND (Tags.[]:{"Key": "Customer", "Value": "OIAGlobal"})'
+        policies:
+          automated-onboarding.automated-onboarding:
+            log_level: INFO
+            chef:
+              organisation_name: cloudreach-oiaglobal
+              short_code: OIAC
+              environment: oia-cr-connect
+              runlist:
+              - role[meta-base-no-al]
+              install_version: '15'
+AWS Backup Solution OIA-global bellville_eu:
+    query: 'resource_type: aws.ec2.instance AND (Tags.[]:{"Key": "Cloudreach Backup
+      Group", "Value": "bellville_eu"} AND NOT Tags.[]:{"Key": "Cloudreach Backup
+      Ignore", "Value": "True"}) AND AccountId:"271725455000"'
+    policies:
+      aws-backups.backup-configuration:
+        bellville_eu_backup:
+          rules:
+            Monthly:
+              schedule: 0 0 10 * ? *   # 00:00 AM on the 10th Day of every Month
+              retention_days: 60
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Weekly:
+              schedule: 00 01 ? * 1 *   # 1:00 AM on every monday of week
+              retention_days: 21
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Daily:
+              schedule: 0 2 ? * * *   # 2:00 AM on everyday
+              retention_days: 7
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+AWS Backup Solution OIA-global bellville_eu_monthly_3:
+    query: 'resource_type: aws.ec2.instance AND (Tags.[]:{"Key": "Cloudreach Backup
+      Group", "Value": "bellville_eu_monthly_3"} AND NOT Tags.[]:{"Key": "Cloudreach
+      Backup Ignore", "Value": "True"}) AND AccountId:"271725455000"'
+    policies:
+      aws-backups.backup-configuration:
+        bellville_eu_monthly_3_backup:
+          rules:
+            Yearly:
+              schedule: 00 03 31 12 ? *   # 03:00 AM on 31st Day of 12th Month every year
+              retention_days: 365
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Monthly:
+              schedule: 0 0 10 * ? *   # 00:00 AM on the 10th Day of every Month
+              retention_days: 90
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Weekly:
+              schedule: 00 01 ? * 1 *   # 1:00 AM on every monday of week
+              retention_days: 21
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Daily:
+              schedule: 0 2 ? * * *   # 2:00 AM on everyday
+              retention_days: 7
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+AWS Backup Solution OIA-global bellville_eu_monthly_6:
+    query: 'resource_type: aws.ec2.instance AND (Tags.[]:{"Key": "Cloudreach Backup
+      Group", "Value": "bellville_eu_monthly_6"} AND NOT Tags.[]:{"Key": "Cloudreach
+      Backup Ignore", "Value": "True"}) AND AccountId:"271725455000"'
+    policies:
+      aws-backups.backup-configuration:
+        bellville_eu_monthly_6_backup:
+          rules:
+            Yearly:
+              schedule: 00 03 31 12 ? *   # 03:00 AM on 31st Day of 12th Month every year
+              retention_days: 365
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Monthly:
+              schedule: 0 0 10 * ? *   # 00:00 AM on the 10th Day of every Month
+              retention_days: 180
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Weekly:
+              schedule: 00 01 ? * 1 *   # 1:00 AM on every monday of week
+              retention_days: 21
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+            Daily:
+              schedule: 0 2 ? * * *   # 2:00 AM on everyday
+              retention_days: 7
+              start_window_minutes: 60
+              completion_window_minutes: 120
+              recovery_point_tags:
+                CloudreachSupport: RecoveryBackup
+Discovered AWS Accounts:
+    query: resource_type:aws.account
+    children:
+      Bellvillerodair:
+        query: AccountId:"271725455000"
+      OIA-Connect:
+        query: AccountId:"679870666530"
+OIA Patching:
+    query: '(resource_type: core.resource_group AND display_id: "OIA Patching") OR
+      (Tags.[]:{"Key": "Cloudreach Patching Event", "Value": "Production"} AND NOT
+      Tags.[]:{"Key": "Cloudreach Patching Ignore", "Value": "True"})'
+    policies:
+      automated_patching.scheduling:
+        rfc_id: CHG0057509
+        schedule: 0 18 25 11 ? 2023
+        check_iam_policies: false
