@@ -64,7 +64,7 @@ Invoke-Sqlcmd -Query "INSERT INTO dbo.Provisioning (Subscription, Location, vnet
     -ServerInstance "sql-autoacc-test.database.windows.net" -Credential $sqlcreds -Database "sql-autoacc-test" -QueryTimeout 20
 
 
-$configdbreturn = Invoke-Sqlcmd -Query "SELECT * From dbo.Provisioning WHERE (Location like '$Location') AND (Subscription like '$SubscriptionName'); " `
+$configdbreturn = Invoke-Sqlcmd -Query "SELECT * From dbo.Provisioning WHERE Subscription='$SubscriptionName'; " `
     -ServerInstance "sql-autoacc-test.database.windows.net" -Credential $sqlcreds -Database "sql-autoacc-test" -QueryTimeout 20
 
 write-Output "Config DB request return"
