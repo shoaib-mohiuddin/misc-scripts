@@ -1,13 +1,13 @@
 
 Param(
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string] $SubscriptionName,
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string] $Location,
-	[Parameter(Mandatory = $true)]
+	[Parameter(Mandatory = $false)]
     [string] $vnetName,
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string] $centraldiagaccount,
     [Parameter(Mandatory = $false)]
     [string] $diagSA,
@@ -38,7 +38,7 @@ Import-Module Az.Resources
 
 
 select-azsubscription -subscriptionname $SubscriptionName
-$sqlcreds = Get-AutomationPSCredential -Name 'sql-autoacc-test.database.windows.net'
+$sqlcreds = Get-AutomationPSCredential -Name 'sql-autoacc-test.database.windows.net' 
 
 #trim all spaces from the front and tail
 function funccullspaces($param) {
