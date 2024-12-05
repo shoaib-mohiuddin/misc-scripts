@@ -13,7 +13,10 @@ param (
     [string]$subscriptionName,
 
     [Parameter(Mandatory=$false)]
-    [array]$customRoutes
+    [array]$customRoutes,
+
+    [Parameter(Mandatory=$false)]
+    [string]$subnetAddressPrefix
 )
 
 try
@@ -35,12 +38,12 @@ function funccullspaces($param) {
 $mode = funccullspaces($mode)
 $routeTableName = funccullspaces($routeTableName)
 $resourceGroup = funccullspaces($resourceGroup)
-$subscriptionName = funccullspaces($subscriptionName)
+# $subscriptionName = funccullspaces($subscriptionName)
 
 $sqlcreds = Get-AutomationPSCredential -Name 'sql-autoacc-test.database.windows.net'
 
-Select-AzSubscription -SubscriptionName $subscriptionName
-Write-Output "Selected Subscription: $subscriptionName"
+# Select-AzSubscription -SubscriptionName $subscriptionName
+# Write-Output "Selected Subscription: $subscriptionName"
 
 # Retrieve subscription tags
 $Subscription = Get-AzSubscription -SubscriptionName $subscriptionName
@@ -49,109 +52,110 @@ $Tags = $Subscription.Tags
 if ($Tags["SubscriptionType"] -ne "DatacenterExtension") {
     Write-Output "Subscription $subscriptionName is not tagged with SubscriptionType=DatacenterExtension. Exiting."
     return
-}
+} 
+else {
 
-Write-Output "Subscription $subscriptionName is valid with SubscriptionType=DatacenterExtension. Proceeding..."
+    Write-Output "Subscription $subscriptionName is valid with SubscriptionType=DatacenterExtension. Proceeding..."
 
-# Disable Resource Group Lock
-Write-Output "Disabling locks on Resource Group: $resourceGroup"
-$Locks = Get-AzResourceLock -ResourceGroupName $resourceGroup 
-if ($Locks) {
-    foreach ($Lock in $Locks) {
-        Remove-AzResourceLock -LockId $Lock.LockId
-    }
-    Write-Output "Resource group locks disabled."
-}
-
-# Retrieve the Route Table
-# $RouteTableObj = Get-AzRouteTable -ResourceGroupName $ResourceGroup -Name $routeTableName
-
-# Handle operations based on the selected mode
-switch ($mode) {
-    "create" {
-        if ($resourceGroup -notcontains "*-NETWORK-*") {
-            Write-Error "Resource group name does not contain '*-NETWORK-*'. Operation not permitted."
-            break
-        } else {
-            Write-Output "Creating new Route Table: $routeTableName in Resource Group: $resourceGroup"
-            $RouteTableObj = New-AzRouteTable -Name $routeTableName -ResourceGroupName $resourceGroup -Location (Get-AzResourceGroup -Name $resourceGroup).Location 
-            Write-Output "Route Table created successfully."
-
-            Add-StandardRoutes -RouteTable $RouteTableObj
-            Add-LocalRoutes -RouteTable $RouteTableObj
-
-            if ($customRoutes) {
-                Add-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
-            }
-        } 
-        # else {
-        #     Write-Error "Route Table $routeTableName already exists."
-        # }
+    # Disable Resource Group Lock
+    Write-Output "Disabling locks on Resource Group: $resourceGroup"
+    $Locks = Get-AzResourceLock -ResourceGroupName $resourceGroup 
+    if ($Locks) {
+        foreach ($Lock in $Locks) {
+            Remove-AzResourceLock -LockId $Lock.LockId
+        }
+        Write-Output "Resource group locks disabled."
     }
 
-    "addRoutes" {
-        if ($routeTableName) {
-            if ($customRoutes) {
-                Write-Output "Adding custom routes to Route Table: $routeTableName"
-                Add-CustomRoutes -RouteTable $routeTableName -CustomRoutes $customRoutes
+    # Retrieve the Route Table
+    # $RouteTableObj = Get-AzRouteTable -ResourceGroupName $ResourceGroup -Name $routeTableName
+
+    # Handle operations based on the selected mode
+    switch ($mode) {
+        "create" {
+            if ($resourceGroup -notcontains "*-NETWORK-*") {
+                Write-Error "Resource group name does not contain '*-NETWORK-*'. Operation not permitted."
+                break
             } else {
-                Write-Error "No custom routes provided for 'addRoutes' mode."
-            }
-        } else {
-            Write-Error "Route Table $routeTableName does not exist."
-        }
-    }
+                Write-Output "Creating new Route Table: $routeTableName in Resource Group: $resourceGroup"
+                $RouteTableObj = New-AzRouteTable -Name $routeTableName -ResourceGroupName $resourceGroup -Location (Get-AzResourceGroup -Name $resourceGroup).Location 
+                Write-Output "Route Table created successfully."
 
-    "deleteRoutes" {
-        if ($routeTableName) {
-            if ($customRoutes) {
-                Write-Output "Deleting custom routes from Route Table: $routeTableName"
-                Delete-CustomRoutes -RouteTable $routeTableName -CustomRoutes $customRoutes
+                Add-StandardRoutes -RouteTable $RouteTableObj
+                Add-LocalRoutes -RouteTable $RouteTableObj
+
+                if ($customRoutes) {
+                    Add-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
+                }
+            } 
+            # else {
+            #     Write-Error "Route Table $routeTableName already exists."
+            # }
+        }
+
+        "addRoutes" {
+            if ($routeTableName) {
+                if ($customRoutes) {
+                    Write-Output "Adding custom routes to Route Table: $routeTableName"
+                    Add-CustomRoutes -RouteTable $routeTableName -CustomRoutes $customRoutes
+                } else {
+                    Write-Error "No custom routes provided for 'addRoutes' mode."
+                }
             } else {
-                Write-Error "No custom routes provided for 'deleteRoutes' mode."
+                Write-Error "Route Table $routeTableName does not exist."
             }
-        } else {
-            Write-Error "Route Table $routeTableName does not exist."
+        }
+
+        "deleteRoutes" {
+            if ($routeTableName) {
+                if ($customRoutes) {
+                    Write-Output "Deleting custom routes from Route Table: $routeTableName"
+                    Delete-CustomRoutes -RouteTable $routeTableName -CustomRoutes $customRoutes
+                } else {
+                    Write-Error "No custom routes provided for 'deleteRoutes' mode."
+                }
+            } else {
+                Write-Error "Route Table $routeTableName does not exist."
+            }
+        }
+
+        "delete" {
+            if ($routeTableName) {
+                Write-Output "Deleting Route Table: $routeTableName"
+                Remove-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName -Force
+                Write-Output "Route Table deleted successfully."
+            } else {
+                Write-Error "Route Table $routeTableName does not exist."
+            }
+        }
+
+        "update" {
+            if ($resourceGroup -notcontains "*-NETWORK-*") {
+                Write-Output "Moving the Route Table $routeTableName to the correct resource group for the associated VNet..."
+                # Logic to move the Route Table to the correct resource group
+                Move-RouteTableToVNetResourceGroup -RouteTableName $routeTableName -ResourceGroupName $resourceGroup
+            }
+
+            if ($routeTableName) {
+                Write-Output "Updating Route Table: $routeTableName"
+                Add-StandardRoutes -RouteTable $routeTableName
+                # Add-LocalRoutes -RouteTable $routeTableName
+                Write-Output "Route Table updated successfully."
+            } else {
+                Write-Error "Route Table $routeTableName does not exist."
+            }
         }
     }
 
-    "delete" {
-        if ($routeTableName) {
-            Write-Output "Deleting Route Table: $routeTableName"
-            Remove-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName -Force
-            Write-Output "Route Table deleted successfully."
-        } else {
-            Write-Error "Route Table $routeTableName does not exist."
+    # Enable Resource Group Lock
+    Write-Output "Enabling locks on Resource Group: $ResourceGroup"
+    if ($Locks) {
+        foreach ($Lock in $Locks) {
+            New-AzResourceLock -LockName $Lock.LockName -LockLevel $Lock.Level -ResourceGroupName $ResourceGroup
         }
-    }
-
-    "update" {
-        if ($resourceGroup -notcontains "*-NETWORK-*") {
-            Write-Output "Moving the Route Table $routeTableName to the correct resource group for the associated VNet..."
-            # Logic to move the Route Table to the correct resource group
-            Move-RouteTableToVNetResourceGroup -RouteTableName $routeTableName -ResourceGroupName $resourceGroup
-        }
-
-        if ($routeTableName) {
-            Write-Output "Updating Route Table: $routeTableName"
-            Add-StandardRoutes -RouteTable $routeTableName
-            # Add-LocalRoutes -RouteTable $routeTableName
-            Write-Output "Route Table updated successfully."
-        } else {
-            Write-Error "Route Table $routeTableName does not exist."
-        }
+        Write-Output "Resource group locks re-enabled."
     }
 }
-
-# Enable Resource Group Lock
-Write-Output "Enabling locks on Resource Group: $ResourceGroup"
-if ($Locks) {
-    foreach ($Lock in $Locks) {
-        New-AzResourceLock -LockName $Lock.LockName -LockLevel $Lock.Level -ResourceGroupName $ResourceGroup
-    }
-    Write-Output "Resource group locks re-enabled."
-}
-
 ################################################################################
 # Function placeholders for adding routes and moving route tables
 function Add-StandardRoutes {
@@ -253,12 +257,12 @@ function Delete-CustomRoutes {
 
 function Move-RouteTableToVNetResourceGroup {
     param (
-        [Parameter(Mandatory = $true)] [string] $routeTableName
+        [Parameter(Mandatory = $true)] [string] $routeTableName,
         [Parameter(Mandatory = $true)] [string] $resourceGroup
     )
     Write-Output "Route Table $routeTableName moved to the correct VNet resource group (placeholder)."
 
     $destRGName = ((Get-AzRouteTable -Name "RT-SUB-HINT-INFRA-DEV-TEST-SINGULARSQL-NE01").SubnetsText | ConvertFrom-Json).Id -split '/' | Select-Object -Index 4
-    $resources = Get-AzResource -ResourceGroupName $resourceGroup | Where-Object { $_.Name -in $routeTableName }
+    $resources = Get-AzResource -ResourceGroupName $resourceGroup | Where-Object { $_.Name -eq $routeTableName }
     Move-AzResource -DestinationResourceGroupName $destRGName -ResourceId $resources.ResourceId
 }
