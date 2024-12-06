@@ -158,6 +158,7 @@ else {
 }
 ################################################################################
 # Function placeholders for adding routes and moving route tables
+
 function Add-StandardRoutes {
     param ([Parameter(Mandatory = $true)] $RouteTableObj)
     Write-Output "Adding standard routes to Route Table: $($RouteTableObj.Name)."
