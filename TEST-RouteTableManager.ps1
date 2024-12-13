@@ -107,31 +107,40 @@ function Add-StandardRoutes {
     }
 }
 
+# To avoid route overwrite,
+# 1. Retrieve the latest route table object from Azure at the beginning of every function using Get-AzRouteTable.
+# 2. Modify the route table in-memory using Add-AzRouteConfig.
+# 3. Commit the changes to Azure using Set-AzRouteTable immediately after every function's updates.
+
 function Add-LocalRoutes {
     param ([Parameter(Mandatory = $true)] $RouteTableObj)
-    Write-Output "Adding local routes to Route Table: $($RouteTableObj.Name) (placeholder)."
+    Write-Output "Adding local routes to Route Table: $($RouteTableObj.Name)"
 
-    if ($LocalSubnetAddressPrefix){
-        Add-AzRouteConfig -Name "LocalSubnet" -AddressPrefix $LocalSubnetAddressPrefix -NextHopType "VnetLocal" -RouteTable  $RouteTableObj
-    }
+    $RouteTableObj = Get-AzRouteTable -Name $routeTableName
+    Add-AzRouteConfig -Name "LocalSubnet" -AddressPrefix $LocalSubnetAddressPrefix -NextHopType "VnetLocal" -RouteTable  $RouteTableObj
+    Set-AzRouteTable -RouteTable $RouteTableObj
 }
 
 function Add-CustomRoutes {
     param ([Parameter(Mandatory = $true)] $RouteTableObj, [Parameter(Mandatory = $true)] $customRoutes)
-    Write-Output "Adding custom routes to Route Table: $($RouteTableObj.Name) (placeholder)."
+    Write-Output "Adding custom routes to Route Table: $($RouteTableObj.Name)"
 
+    $RouteTableObj = Get-AzRouteTable -Name $routeTableName
     foreach ($customRoute in $customRoutes) {
-        Add-AzRouteConfig -Name $customRoute.Name -AddressPrefix $customRoute.AddressPrefix -NextHopType $customRoute.NextHopType -NextHopIpAddress $customRoute.NextHopIPAddress -RouteTable  $RouteTableObj
+        Add-AzRouteConfig -Name $customRoute.routeName -AddressPrefix $customRoute.addressPrefix -NextHopType $customRoute.nextHopType -NextHopIpAddress $customRoute.nextHopIpAddress -RouteTable  $RouteTableObj
     }
+    Set-AzRouteTable -RouteTable $RouteTableObj
 }
 
 function Delete-CustomRoutes {
-    param ([Parameter(Mandatory = $true)] $routeTableName, [Parameter(Mandatory = $true)] $customRoutes)
-    Write-Output "Deleting custom routes from Route Table: $($routeTableName) (placeholder)."
+    param ([Parameter(Mandatory = $true)] $RouteTableObj, [Parameter(Mandatory = $true)] $customRoutes)
+    Write-Output "Deleting custom routes from Route Table: $($routeTableName)"
 
+    $RouteTableObj = Get-AzRouteTable -Name $routeTableName
     foreach ($customRoute in $customRoutes) {
-        Remove-AzRouteConfig -Name $customRoute.Name -RouteTable $routeTableName
+        Remove-AzRouteConfig -Name $customRoute.routeName -RouteTable $RouteTableObj
     }
+    Set-AzRouteTable -RouteTable $RouteTableObj
 }
 
 function Move-RouteTableToVNetResourceGroup {
@@ -139,7 +148,7 @@ function Move-RouteTableToVNetResourceGroup {
         [Parameter(Mandatory = $true)] [string] $routeTableName,
         [Parameter(Mandatory = $true)] [string] $resourceGroup
     )
-    Write-Output "Route Table $routeTableName moved to the correct VNet resource group (placeholder)."
+    Write-Output "Route Table $routeTableName moved to the correct VNet resource group."
 
     $destRGName = ((Get-AzRouteTable -Name "RT-SUB-HINT-INFRA-DEV-TEST-SINGULARSQL-NE01").SubnetsText | ConvertFrom-Json).Id -split '/' | Select-Object -Index 4
     $resources = Get-AzResource -ResourceGroupName $resourceGroup | Where-Object { $_.Name -eq $routeTableName }
@@ -157,18 +166,18 @@ function Validate-RouteTables {
     foreach ($subscription in $subscriptions) {
         $Tags = $subscription.Tags
         if ($Tags["SubscriptionType"] -ne "DatacenterExtension") {
-            Write-Output "Subscription $subscription is not tagged with SubscriptionType=DatacenterExtension. Exiting."
+            Write-Output "Subscription $($subscription.Name) is not tagged with SubscriptionType=DatacenterExtension. Exiting."
         } 
         else {
-            Write-Output "Subscription $subscription is tagged with SubscriptionType=DatacenterExtension. Proceeding..."
+            Write-Output "Subscription $($subscription.Name) is tagged with SubscriptionType=DatacenterExtension. Proceeding..."
             $routeTables = Get-AzRouteTable
             foreach ($routeTable in $routeTables) {
                 if ($routeTable.ResourceGroupName -notlike "*-NETWORK-*") {
-                    Write-Output "$routeTable is in Incorrect resource group"
+                    Write-Output "$($routeTable.Name) is in Incorrect resource group $($routeTable.ResourceGroupName)"
                     $RG_Compliance = "Incorrect resource group"
                 } 
                 else {
-                    Write-Output "$routeTable is in Correct resource group"
+                    Write-Output "$($routeTable.Name) is in Correct resource group $($routeTable.ResourceGroupName)"
                     $RG_Compliance = "Correct resource group"
                 }
 
@@ -271,7 +280,7 @@ function Validate-RouteTables {
 $mode = funccullspaces($mode)
 $routeTableName = funccullspaces($routeTableName)
 $resourceGroup = funccullspaces($resourceGroup)
-# $subscriptionName = funccullspaces($subscriptionName)
+$subscriptionName = funccullspaces($subscriptionName)
 
 $sqlcreds = Get-AutomationPSCredential -Name 'sql-prod-it-automation-ne01.database.windows.net'
 
@@ -291,14 +300,14 @@ else {
     Write-Output "Subscription $subscriptionName is tagged with SubscriptionType=DatacenterExtension. Proceeding..."
 
     # Disable Resource Group Lock
-    Write-Output "Disabling locks on Resource Group: $resourceGroup"
-    $Locks = Get-AzResourceLock -ResourceGroupName $resourceGroup 
-    if ($Locks) {
-        foreach ($Lock in $Locks) {
-            Remove-AzResourceLock -LockId $Lock.LockId -Force
-        }
-        Write-Output "Resource group locks disabled."
-    }
+    # $Locks = Get-AzResourceLock -ResourceGroupName $resourceGroup 
+    # if ($Locks) {
+    #     Write-Output "Disabling locks on Resource Group: $resourceGroup"
+    #     foreach ($Lock in $Locks) {
+    #         Remove-AzResourceLock -LockId $Lock.LockId -Force
+    #     }
+    #     Write-Output "Resource group locks disabled."
+    # }
 
     # Retrieve the Route Table
     # $RouteTableObj = Get-AzRouteTable -ResourceGroupName $ResourceGroup -Name $routeTableName
@@ -309,28 +318,29 @@ else {
             if ($resourceGroup -notlike "*-NETWORK-*") {
                 Write-Error "Resource group name does not contain '*-NETWORK-*'. Operation not permitted."
                 break
-            } else {
+            } 
+            else {
                 Write-Output "Creating new Route Table: $routeTableName in Resource Group: $resourceGroup"
                 $RouteTableObj = New-AzRouteTable -Name $routeTableName -ResourceGroupName $resourceGroup -Location (Get-AzResourceGroup -Name $resourceGroup).Location 
                 Write-Output "Route Table created successfully."
 
                 Add-StandardRoutes -RouteTable $RouteTableObj
-                Add-LocalRoutes -RouteTable $RouteTableObj
+
+                if ($LocalSubnetAddressPrefix) {
+                    Add-LocalRoutes -RouteTable $RouteTableObj
+                }
 
                 if ($customRoutes) {
                     Add-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
                 }
             } 
-            # else {
-            #     Write-Error "Route Table $routeTableName already exists."
-            # }
         }
 
         "addRoutes" {
-            if ($routeTableName) {
+            $RouteTableObj = Get-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName
+            if ($RouteTableObj) {
                 if ($customRoutes) {
-                    Write-Output "Adding custom routes to Route Table: $routeTableName"
-                    Add-CustomRoutes -RouteTable $routeTableName -CustomRoutes $customRoutes
+                    Add-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
                 } else {
                     Write-Error "No custom routes provided for 'addRoutes' mode."
                 }
@@ -340,10 +350,10 @@ else {
         }
 
         "deleteRoutes" {
-            if ($routeTableName) {
+            $RouteTableObj = Get-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName
+            if ($RouteTableObj) {
                 if ($customRoutes) {
-                    Write-Output "Deleting custom routes from Route Table: $routeTableName"
-                    Delete-CustomRoutes -RouteTable $routeTableName -CustomRoutes $customRoutes
+                    Delete-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
                 } else {
                     Write-Error "No custom routes provided for 'deleteRoutes' mode."
                 }
@@ -353,7 +363,8 @@ else {
         }
 
         "delete" {
-            if ($routeTableName) {
+            $RouteTableObj = Get-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName
+            if ($RouteTableObj) {
                 Write-Output "Deleting Route Table: $routeTableName"
                 Remove-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName -Force
                 Write-Output "Route Table deleted successfully."
@@ -363,15 +374,17 @@ else {
         }
 
         "update" {
-            if ($resourceGroup -notcontains "*-NETWORK-*") {
-                Write-Output "Moving the Route Table $routeTableName to the correct resource group for the associated VNet..."
-                # Logic to move the Route Table to the correct resource group
-                Move-RouteTableToVNetResourceGroup -RouteTableName $routeTableName -ResourceGroupName $resourceGroup
-            }
+            # if ($resourceGroup -notlike "*-NETWORK-*") {
+            #     Write-Output "Moving the Route Table $routeTableName to the correct resource group for the associated VNet..."
+            #     # Logic to move the Route Table to the correct resource group
+            #     Move-RouteTableToVNetResourceGroup -RouteTableName $routeTableName -ResourceGroupName $resourceGroup
+            # }
 
-            if ($routeTableName) {
+            $RouteTableObj = Get-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName
+
+            if ($RouteTableObj) {
                 Write-Output "Updating Route Table: $routeTableName"
-                Add-StandardRoutes -RouteTable $routeTableName
+                Add-StandardRoutes -RouteTable $RouteTableObj
                 # Add-LocalRoutes -RouteTable $routeTableName
                 Write-Output "Route Table updated successfully."
             } else {
@@ -385,13 +398,13 @@ else {
     }
 
     # Enable Resource Group Lock
-    Write-Output "Enabling locks on Resource Group: $resourceGroup"
-    if ($Locks) {
-        foreach ($Lock in $Locks) {
-            New-AzResourceLock -LockName $Lock.Name -LockLevel $Lock.Properties.level -ResourceGroupName $resourceGroup -Force
-        }
-        Write-Output "Resource group locks re-enabled."
-    }
+    # if ($Locks) {
+    #     Write-Output "Enabling locks on Resource Group: $resourceGroup"
+    #     foreach ($Lock in $Locks) {
+    #         New-AzResourceLock -LockName $Lock.Name -LockLevel $Lock.Properties.level -ResourceGroupName $resourceGroup -Force
+    #     }
+    #     Write-Output "Resource group locks re-enabled."
+    # }
 }
 
 if ($RT_Report.Count -gt 0) {
@@ -399,14 +412,14 @@ if ($RT_Report.Count -gt 0) {
 
     #PagerDuty
     $pagerDutyApiUrl = "https://events.pagerduty.com/v2/enqueue"
-    $pagerDutyRoutingKey = ""  # Add key here
+    $pagerDutyRoutingKey = "a028a804e290450cd037d428891aacba"  # Add key here
 
     $pagerDutyPayload = @{
         routing_key = $pagerDutyRoutingKey
         event_action = "trigger"
         payload = @{
-            summary = "Route Table misconfigurations detected for Subscription $subscription"
-            severity = "info"  # Adjust based on severity (info, warning, error, critical)
+            summary = "[TEST] Route Table misconfigurations detected for Subscription $subscription"
+            severity = "warning"  # Adjust based on severity (info, warning, error, critical)
             source = "Azure Automation Account"
             # component = "Azure Route Tables"
             custom_details = @{
