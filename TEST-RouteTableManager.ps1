@@ -160,9 +160,10 @@ function Validate-RouteTables {
     $RG_Compliance = ""
     $RT_Compliance = ""
     # $RT_Report = @()
-    $subscriptions = Get-AzSubscription
+    # $subscriptions = Get-AzSubscription 
+    $subscription = Get-AzSubscription -SubscriptionName $subscriptionName
 
-    foreach ($subscription in $subscriptions) {
+    # foreach ($subscription in $subscriptions) {
         Set-AzContext -SubscriptionId $subscription.Id
         $Tags = $subscription.Tags
         if ($Tags["SubscriptionType"] -ne "DatacenterExtension") {
@@ -171,18 +172,21 @@ function Validate-RouteTables {
         else {
             Write-Output "Subscription $($subscription.Name) is tagged with SubscriptionType=DatacenterExtension. Proceeding..."
             $routeTables = Get-AzRouteTable
+            # $routeTable = Get-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName
             foreach ($routeTable in $routeTables) {
-                if ($routeTable.ResourceGroupName -notlike "*-NETWORK-*") {
-                    Write-Output "$($routeTable.Name) is in Incorrect resource group $($routeTable.ResourceGroupName)"
-                    $RG_Compliance = "Incorrect resource group"
-                } 
-                else {
-                    Write-Output "$($routeTable.Name) is in Correct resource group $($routeTable.ResourceGroupName)"
-                    $RG_Compliance = "Correct resource group"
+                if (($reportTable.Name -notlike "*-PALO-*") -and ($routeTable.Name -notlike "RT-PROD-GW-*")) {
+                    if ($routeTable.ResourceGroupName -notlike "*-NETWORK-*") {
+                        Write-Output "$($routeTable.Name) is in Incorrect resource group $($routeTable.ResourceGroupName)"
+                        $RG_Compliance = "Incorrect resource group"
+                    } 
+                    else {
+                        Write-Output "$($routeTable.Name) is in Correct resource group $($routeTable.ResourceGroupName)"
+                        $RG_Compliance = "Correct resource group"
+                    }
                 }
-
-                if (($routeTable.Name -notcontains "*-PALO-*") -and ($routeTable.Name -notcontains "RT-PROD-GW-*")) {
-                    Write-Output "Validating route table $($routeTable.Name)..."
+                
+                if (($routeTable.Name -notlike "*-PALO-*") -and ($routeTable.Name -notlike "RT-PROD-GW-*")) {
+                    Write-Output "Validating route table $($routeTable.Name) ..."
                     switch -Wildcard ($routeTable.location) {
                         "NorthEurope" {
                             $Hub = "EU-HUB"
@@ -223,7 +227,6 @@ function Validate-RouteTables {
                     $currentRoutes = $routeTable.Routes
                     # Compare routes
                     $missingRoutes = @()
-                    # $extraRoutes = @()
 
                     Write-Output "Checking for missing routes..."
                     foreach ($dbRoute in $dbRoutes) {
@@ -235,50 +238,24 @@ function Validate-RouteTables {
                             }
                         
                             if (-not $match) {
-                                Write-Output "Missing route found: $($dbRoute.Name)"
-                                $missingRoutes += $dbRoute
+                                # Write-Output "Missing route found: $($dbRoute.Name)"
+                                $missingRoutes += $dbRoute.Name
                             }
                         }
                     }
 
-                    # Write-Output "Checking for extra routes..."
-                    # foreach ($currentRoute in $currentRoutes) {
-                    #     $match = $dbRoutes | Where-Object {
-                    #         $_.Name -eq $currentRoute.Name -and
-                    #         $_.AddressPrefix -eq $currentRoute.AddressPrefix -and
-                    #         $_.NextHopType -eq $currentRoute.NextHopType
-                    #     }
-                    
-                    #     if (-not $match) {
-                    #         Write-Output "Extra route found: $($currentRoute.Name)"
-                    #         $extraRoutes += $currentRoute
-                    #     }
-                    # }
-                    
-                    # Log misconfigurations
-                    # if ($missingRoutes) {
-                    #     Write-Output "Missing routes in route table:"
-                    #     $missingRoutes | Format-Table
-                    # }
-                    
-                    # if ($extraRoutes) {
-                    #     Write-Output "Extra routes in route table:"
-                    #     $extraRoutes | Format-Table
-                    # }
-
                     if ($missingRoutes) {
-                        Write-Output "Missing routes in $($routeTable.Name):"
-                        $missingRoutes | Format-Table
-                        # $extraRoutes | Format-Table
-                        $RT_Compliance = "Route table non-compliant with DB"
-                        $RT_Report += [PSCustomObject]@{
+                        Write-Output "Missing routes found"
+                        # Write-Output "Missing routes in $($routeTable.Name):"
+                        # $missingRoutes | Format-Table
+                        # $RT_Compliance = "Route table non-compliant with DB"
+                        $RT_Report.Value += [PSCustomObject]@{
                             SubscriptionName = $subscription.Name
                             ResourceGroupName = $routeTable.ResourceGroupName
                             RouteTableName = $routeTable.Name
                             RG_Compliance = $RG_Compliance
-                            RT_Compliance = $RT_Compliance
-                            MissingRoutes = $missingRoutes
-                            # ExtraRoutes = $extraRoutes
+                            # RT_Compliance = $RT_Compliance
+                            MissingRoutes = $missingRoutes -join ", "
                         }
                     } else { 
                         Write-Output "No missing routes in $($routeTable.Name)" 
@@ -286,10 +263,11 @@ function Validate-RouteTables {
                 }
             }
         }
-    }
-    # Write-Output "Route Table Compliance Report:" 
-    # $RT_Report | Format-Table
+    # }
+    # Write-Output "Route Table Compliance Report:(inside function block)" 
+    # $RT_Report.Value | Format-Table
 }
+
 
 $mode = funccullspaces($mode)
 $routeTableName = funccullspaces($routeTableName)
@@ -408,7 +386,37 @@ else {
 
         "validate" {
             $RT_Report = @()
-            Validate-RouteTables -RT_Report ([ref]$RT_Report)
+            Validate-RouteTables -RT_Report ([ref] $RT_Report)
+
+            Write-Output "Route Table Compliance Report:(outside function block)" 
+            $RT_Report | Format-Table -AutoSize
+            Write-Output "RT_Report Count: $($RT_Report.Count)"
+
+            # $reportTable = $RT_Report | Format-Table
+            $subject = "[TEST] Route Table misconfigurations detected "
+
+            $Header = @"
+<style>
+TABLE {border-width: 1px; border-style: solid; border-color: black; border-collapse: collapse;}
+TH {border-width: 1px; padding: 3px; border-style: solid; border-color: black; background-color: #6495ED;}
+TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black;}
+</style>
+"@
+
+            ####################################################################################################################
+            $body = $RT_Report | ConvertTo-Html -Head $Header | Out-String
+            # $body = $reportTable | ConvertTo-Html -Head $Header | Out-String
+            $table_txt = $body
+            $table_txt = $table_txt.Replace(' ', '@@@')
+            $subject = $subject.Replace(' ', '@@@')
+
+            $EmailFrom = "AzureAutomation@service.howdengrp.com"
+            $EmailTo = "shoaib.mohiuddin@cloudreach.com"
+            $ToName = "CloudreachSupport"
+            $params = [ordered]@{"Key1"=$EmailTo;"Key2"="$table_txt";"Key3"=$EmailFrom;"Key4"=$subject;"Key5"=$ToName}
+            Select-AzSubscription -SubscriptionId "ec057239-e4b9-4f3a-bb91-769e0d722e04"
+            Start-AzAutomationRunbook -AutomationAccountName "AUTOACC-PROD-IT-OPS" -Name "Communication-Services" -ResourceGroupName "RG-PROD-IT-AUTOMATION-NE01" -Parameters $params
+
         }
     }
 
@@ -422,47 +430,47 @@ else {
     # }
 }
 
-Write-Output "RT_Report Count: $($RT_Report.Count)"
-if ($RT_Report.Count -gt 0) {
-    # $reportTable = $RT_Report | Format-Table -AutoSize | Out-String
-    $reportMarkdown = @"
-| SubscriptionName | ResourceGroupName | RouteTableName | RG_Compliance | MissingRoutes | |-------------------|------------------------------------|----------------------------------|-----------------------|------------------------------| $(foreach ($item in $RT_Report) { "| $($item.SubscriptionName) | $($item.ResourceGroupName) | $($item.RouteTableName) | $($item.RG_Compliance) | $($item.MissingRoutes) |" }) 
-"@ 
+# Write-Output "RT_Report Count: $($RT_Report.Count)"
+# if ($RT_Report.Count -gt 0) {
+#     # $reportTable = $RT_Report | Format-Table -AutoSize | Out-String
+#     $reportMarkdown = @"
+# | SubscriptionName | ResourceGroupName | RouteTableName | RG_Compliance | MissingRoutes | |-------------------|------------------------------------|----------------------------------|-----------------------|------------------------------| $(foreach ($item in $RT_Report) { "| $($item.SubscriptionName) | $($item.ResourceGroupName) | $($item.RouteTableName) | $($item.RG_Compliance) | $($item.MissingRoutes) |" }) 
+# "@ 
     
 
-    #PagerDuty
-    Write-Output "Preparing to send PagerDuty alert..."
-    $pagerDutyApiUrl = "https://events.pagerduty.com/v2/enqueue"
-    $pagerDutyRoutingKey = "a028a804e290450cd037d428891aacba"  # Add key here
+#     #PagerDuty
+#     Write-Output "Preparing to send PagerDuty alert..."
+#     $pagerDutyApiUrl = "https://events.pagerduty.com/v2/enqueue"
+#     $pagerDutyRoutingKey = "a028a804e290450cd037d428891aacba"  # Add key here
 
-    $pagerDutyPayload = @{
-        routing_key = $pagerDutyRoutingKey
-        event_action = "trigger"
-        payload = @{
-            summary = "[TEST] Route Table misconfigurations detected"
-            severity = "info"  # Adjust based on severity (info, warning, error, critical)
-            source = "Azure Automation Account"
-            custom_details = $reportTable
-            # custom_details = @{
-            #     Report = $reportTable  # Include report as part of the payload
-            # }
-        }
-    }
+#     $pagerDutyPayload = @{
+#         routing_key = $pagerDutyRoutingKey
+#         event_action = "trigger"
+#         payload = @{
+#             summary = "[TEST] Route Table misconfigurations detected"
+#             severity = "info"  # Adjust based on severity (info, warning, error, critical)
+#             source = "Azure Automation Account"
+#             custom_details = $reportTable
+#             # custom_details = @{
+#             #     Report = $reportTable  # Include report as part of the payload
+#             # }
+#         }
+#     }
 
-    try {
-        # Convert the payload to JSON and send it to PagerDuty API
-        $pagerDutyResponse = Invoke-RestMethod -Uri $pagerDutyApiUrl -Method Post -Body ($pagerDutyPayload | ConvertTo-Json -Depth 3) -ContentType "application/json"
+#     try {
+#         # Convert the payload to JSON and send it to PagerDuty API
+#         $pagerDutyResponse = Invoke-RestMethod -Uri $pagerDutyApiUrl -Method Post -Body ($pagerDutyPayload | ConvertTo-Json -Depth 3) -ContentType "application/json"
 
-        # Check if the PagerDuty alert was triggered successfully
-        if ($pagerDutyResponse.status -eq "success") {
-            Write-Output "PagerDuty alert triggered."
-        } else {
-            Write-Output "Failed to trigger PagerDuty alert."
-        }
-    } catch {
-        Write-Output "Error triggering PagerDuty alert: $_"
-    }
-} 
-# else {
-#     Write-Output "No Route Table misconfigurations were found"
-# }
+#         # Check if the PagerDuty alert was triggered successfully
+#         if ($pagerDutyResponse.status -eq "success") {
+#             Write-Output "PagerDuty alert triggered."
+#         } else {
+#             Write-Output "Failed to trigger PagerDuty alert."
+#         }
+#     } catch {
+#         Write-Output "Error triggering PagerDuty alert: $_"
+#     }
+# } 
+# # else {
+# #     Write-Output "No Route Table misconfigurations were found"
+# # }

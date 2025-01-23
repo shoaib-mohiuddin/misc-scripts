@@ -1,5 +1,5 @@
 | SubscriptionName | ResourceGroupName | RouteTableName | RG_Compliance | MissingRoutes | 
-|-------------------|------------------------------------|----------------------------------|-----------------------| ------------------------------| 
+|------------------|-------------------|----------------|---------------|---------------|
 | DUAL-INFRA-PREPROD | RG-DUAL-INFRA-PREPROD-NETWORK-NE01 | RT-SUB-DUAL-PREPROD-APP-NE | Correct resource group | VNET-HUK-INFRA-PREPROD-NE01 VNET-HUK-INFRA-PREPROD-WE01 | 
 | DUAL-INFRA-PREPROD | RG-DUAL-INFRA-PREPROD-NETWORK-NE01 | RT-SUB-DUAL-PREPROD-FILE-DATA-NE | Correct resource group | VNET-HUK-INFRA-PREPROD-NE01 VNET-HUK-INFRA-PREPROD-WE01 | 
 | DUAL-INFRA-PREPROD | RG-DUAL-INFRA-PREPROD-NETWORK-NE01 | RT-SUB-DUAL-PREPROD-PBIGW-NE | Correct resource group | VNET-HUK-INFRA-PREPROD-NE01 VNET-HUK-INFRA-PREPROD-WE01 | 

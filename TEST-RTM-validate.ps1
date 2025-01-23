@@ -137,10 +137,10 @@ function Validate-RouteTables {
 
 
 
-
+$date = get-date -format "dd-MM-yyyy"
 
 $reportTable = $RT_Report | Format-Table
-$subject = "[TEST] Route Table misconfigurations detected "  + $date
+$subject = "[TEST] Route Table misconfigurations detected - "  + $date
 
 $Header = @"
 <style>
@@ -162,3 +162,5 @@ $ToName = "CloudreachPagerDuty"
 $params = [ordered]@{"Key1"=$EmailTo;"Key2"="$table_txt";"Key3"=$EmailFrom;"Key4"=$subject;"Key5"=$ToName}
 Select-AzSubscription -SubscriptionId "ec057239-e4b9-4f3a-bb91-769e0d722e04"
 Start-AzAutomationRunbook -AutomationAccountName "AUTOACC-PROD-IT-OPS" -Name "Communication-Services" -ResourceGroupName "RG-PROD-IT-AUTOMATION-NE01" -Parameters $params
+
+
