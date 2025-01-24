@@ -1,10 +1,20 @@
+try
+{
+    "Logging in to Azure..."
+    Connect-AzAccount -Identity
+}
+catch {
+    Write-Error -Message $_.Exception
+    throw $_.Exception
+}
+
 function Validate-RouteTables {
     param ( [Parameter(Mandatory = $true)] [ref] $RT_Report )
     $RG_Compliance = ""
     $RT_Compliance = ""
     # $RT_Report = @()
-    # $subscriptions = Get-AzSubscription 
-    $subscription = Get-AzSubscription -SubscriptionName $subscriptionName
+    # $subscriptions = Get-AzSubscription
+    $subscription = Get-AzSubscription -SubscriptionName "DUAL-INFRA-PREPROD"
 
     # foreach ($subscription in $subscriptions) {
         Set-AzContext -SubscriptionId $subscription.Id
@@ -17,7 +27,7 @@ function Validate-RouteTables {
             $routeTables = Get-AzRouteTable
             # $routeTable = Get-AzRouteTable -ResourceGroupName $resourceGroup -Name $routeTableName
             foreach ($routeTable in $routeTables) {
-                if (($reportTable.Name -notcontains "*-PALO-*") -and ($routeTable.Name -notcontains "RT-PROD-GW-*")) {
+                if (($reportTable.Name -notlike "*-PALO-*") -and ($routeTable.Name -notlike "RT-PROD-GW-*")) {
                     if ($routeTable.ResourceGroupName -notlike "*-NETWORK-*") {
                         Write-Output "$($routeTable.Name) is in Incorrect resource group $($routeTable.ResourceGroupName)"
                         $RG_Compliance = "Incorrect resource group"
@@ -27,17 +37,9 @@ function Validate-RouteTables {
                         $RG_Compliance = "Correct resource group"
                     }
                 }
-                # if ($routeTable.ResourceGroupName -notlike "*-NETWORK-*") {
-                #     Write-Output "$($routeTable.Name) is in Incorrect resource group $($routeTable.ResourceGroupName)"
-                #     $RG_Compliance = "Incorrect resource group"
-                # } 
-                # else {
-                #     Write-Output "$($routeTable.Name) is in Correct resource group $($routeTable.ResourceGroupName)"
-                #     $RG_Compliance = "Correct resource group"
-                # }
-
-                if (($routeTable.Name -notcontains "*-PALO-*") -and ($routeTable.Name -notcontains "RT-PROD-GW-*")) {
-                    Write-Output "Validating route table $($routeTable.Name)..."
+                
+                if (($routeTable.Name -notlike "*-PALO-*") -and ($routeTable.Name -notlike "RT-PROD-GW-*")) {
+                    Write-Output "Validating route table $($routeTable.Name) ..."
                     switch -Wildcard ($routeTable.location) {
                         "NorthEurope" {
                             $Hub = "EU-HUB"
@@ -78,7 +80,6 @@ function Validate-RouteTables {
                     $currentRoutes = $routeTable.Routes
                     # Compare routes
                     $missingRoutes = @()
-                    # $extraRoutes = @()
 
                     Write-Output "Checking for missing routes..."
                     foreach ($dbRoute in $dbRoutes) {
@@ -90,39 +91,24 @@ function Validate-RouteTables {
                             }
                         
                             if (-not $match) {
-                                Write-Output "Missing route found: $($dbRoute.Name)"
+                                # Write-Output "Missing route found: $($dbRoute.Name)"
                                 $missingRoutes += $dbRoute.Name
                             }
                         }
                     }
 
-                    # Write-Output "Checking for extra routes..."
-                    # foreach ($currentRoute in $currentRoutes) {
-                    #     $match = $dbRoutes | Where-Object {
-                    #         $_.Name -eq $currentRoute.Name -and
-                    #         $_.AddressPrefix -eq $currentRoute.AddressPrefix -and
-                    #         $_.NextHopType -eq $currentRoute.NextHopType
-                    #     }
-                    
-                    #     if (-not $match) {
-                    #         Write-Output "Extra route found: $($currentRoute.Name)"
-                    #         $extraRoutes += $currentRoute
-                    #     }
-                    # }
-
                     if ($missingRoutes) {
-                        Write-Output "Missing routes in $($routeTable.Name):"
-                        $missingRoutes | Format-Table
-                        # $extraRoutes | Format-Table
+                        Write-Output "Missing routes found"
+                        # Write-Output "Missing routes in $($routeTable.Name):"
+                        # $missingRoutes | Format-Table
                         # $RT_Compliance = "Route table non-compliant with DB"
-                        $RT_Report.Value = $RT_Report.Value + [PSCustomObject]@{
+                        $RT_Report.Value += [PSCustomObject]@{
                             SubscriptionName = $subscription.Name
                             ResourceGroupName = $routeTable.ResourceGroupName
                             RouteTableName = $routeTable.Name
                             RG_Compliance = $RG_Compliance
                             # RT_Compliance = $RT_Compliance
-                            MissingRoutes = $missingRoutes 
-                            # ExtraRoutes = $extraRoutes
+                            MissingRoutes = $missingRoutes -join ", "
                         }
                     } else { 
                         Write-Output "No missing routes in $($routeTable.Name)" 
@@ -131,16 +117,23 @@ function Validate-RouteTables {
             }
         }
     # }
-    Write-Output "Route Table Compliance Report:" 
-    $RT_Report | Format-Table
+    Write-Output "Route Table Compliance Report:(inside function block)" 
+    $RT_Report.Value | Format-Table
 }
 
 
 
 $date = get-date -format "dd-MM-yyyy"
+$sqlcreds = Get-AutomationPSCredential -Name 'sql-prod-it-automation-ne01.database.windows.net'
+$RT_Report = @()
+Validate-RouteTables -RT_Report ([ref] $RT_Report)
 
-$reportTable = $RT_Report | Format-Table
-$subject = "[TEST] Route Table misconfigurations detected - "  + $date
+Write-Output "Route Table Compliance Report:(outside function block)" 
+$RT_Report | Format-Table -AutoSize
+Write-Output "RT_Report Count: $($RT_Report.Count)"
+
+# $reportTable = $RT_Report | Format-Table
+$subject = "[TEST] Route Table misconfigurations detected " + $date
 
 $Header = @"
 <style>
@@ -151,16 +144,17 @@ TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black;}
 "@
 
 ####################################################################################################################
-$body = $reportTable | ConvertTo-Html -head $Header | Out-String
-$table_txt = $body
-# $table_txt = $table_txt.Replace(' ', '@@@')
-# $subject = $subject.Replace(' ', '@@@')
+$body = $RT_Report | ConvertTo-Html -Head $Header | Out-String
+# $body = $reportTable | ConvertTo-Html -Head $Header | Out-String
+$table_txt = $body.Replace(' ', '@@@')
+# $table_txt = [string]$table_txt
+$subject = $subject.Replace(' ', '@@@')
 
 $EmailFrom = "AzureAutomation@service.howdengrp.com"
-$EmailTo = Get-AutomationVariable -Name 'CloudreachPagerDuty'
-$ToName = "CloudreachPagerDuty"
-$params = [ordered]@{"Key1"=$EmailTo;"Key2"="$table_txt";"Key3"=$EmailFrom;"Key4"=$subject;"Key5"=$ToName}
+$EmailTo = "shoaib.mohiuddin@cloudreach.com"
+$ToName = "CloudreachSupport"
+$params = [ordered]@{"Key1"=$EmailTo;"Key2"=$EmailFrom;"Key3"=$subject;"Key4"=$ToName}
+
 Select-AzSubscription -SubscriptionId "ec057239-e4b9-4f3a-bb91-769e0d722e04"
-Start-AzAutomationRunbook -AutomationAccountName "AUTOACC-PROD-IT-OPS" -Name "Communication-Services" -ResourceGroupName "RG-PROD-IT-AUTOMATION-NE01" -Parameters $params
-
-
+Set-AzAutomationVariable -ResourceGroupName "RG-PROD-IT-AUTOMATION-NE01" -AutomationAccountName "AUTOACC-PROD-IT-OPS" -Name "RouteTableReport" -Value $table_txt -Encrypted $False
+Start-AzAutomationRunbook -AutomationAccountName "AUTOACC-PROD-IT-OPS" -Name "TEST-Comm-Service" -ResourceGroupName "RG-PROD-IT-AUTOMATION-NE01" -Parameters $params
