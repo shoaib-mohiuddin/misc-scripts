@@ -18,7 +18,7 @@ variable = automation_client.variable.get(resource_group_name, automation_accoun
 body = variable.value
 html_table = (body.encode('ascii').decode('unicode-escape')).replace("@@@", " " )
 
-connection_string = "endpoint=https://autoacc-prod-it-ops-comm-service.europe.communication.azure.com/;accesskey=k06j0uWI8+DfXJ3z8qKvMrXcDcyStUSBC6N2qXSVqyVPbxerJAvak3scdaaeeBUCmaK8yv3PJzADFVLt80GbNA=="
+connection_string = "endpoint=https://autoacc-prod-it-ops-comm-service.europe.communication.azure.com/;accesskey=xxxxxx"
 email_client = EmailClient.from_connection_string(connection_string)
 
 email_to = sys.argv[1]
