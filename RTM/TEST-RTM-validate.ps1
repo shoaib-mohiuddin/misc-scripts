@@ -76,23 +76,49 @@ function Validate-RouteTables {
                     }
 
                     $dbRoutes = Invoke-Sqlcmd -Query "SELECT * From dbo.Routes WHERE (hubname like '$Hub'); " -ServerInstance "sql-prod-it-automation-ne01.database.windows.net" -Credential $sqlcreds -Database "DB-PROD-OPS-AUTOMATION-NE01" -QueryTimeout 20
+                    
+                    $hubVNets = @("VNET1-EU-North", "VNET1-EU-West", "VNET-PROD-UKS01", "VNET-HSL-INFRA-PROD-SA01", "VNET-HSL-INFRA-PROD-EA01", "VNET-HGS-INFRA-PROD-AE01", "VNET-HGS-INFRA-PROD-UC01", "VNET-HGS-INFRA-PROD-UE01")
+        
+                    # Get the vNet in which the RT exists
+                    $vNet = (Get-AzVirtualNetwork -ResourceGroupName $routeTable.ResourceGroupName | Where-Object { $_.Subnets.Name -eq ($routeTable.Name -replace "^RT-", "") }).Name
 
                     $currentRoutes = $routeTable.Routes
                     # Compare routes
                     $missingRoutes = @()
 
+
                     Write-Output "Checking for missing routes..."
                     foreach ($dbRoute in $dbRoutes) {
                         if (($dbRoute.Region -eq 'all') -or ($dbRoute.Region -eq $routeTable.Location)) {
-                            $match = $currentRoutes | Where-Object {
-                                $_.Name -eq $dbRoute.Name -and
-                                $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
-                                $_.NextHopType -eq $dbRoute.NextHopType
+                            if (($dbRoute.Name -like "PA-P-FW-*") -and ($hubVNets -contains $vNet)) {               #Hub vNet FW trust routes
+                                $match = $currentRoutes | Where-Object {
+                                    $_.Name -eq $dbRoute.Name -and
+                                    $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
+                                    $_.NextHopType -eq $dbRoute.NextHopType -and
+                                    $_.NextHopIpAddress -eq ""
+                                }
+                            }
+                            if (($dbRoute.Name -like "PA-P-FW-*") -and ($hubVNets -notcontains $vNet)) {            #Spoke vNet FW trust routes
+                                $match = $currentRoutes | Where-Object {
+                                    $_.Name -eq $dbRoute.Name -and
+                                    $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
+                                    $_.NextHopType -eq "VirtualAppliance" -and
+                                    $_.NextHopIpAddress -eq ($dbroute.AddressPrefix -replace "/\d+$", "")
+                                }
+                            }
+                            if ($dbRoute.Name -notlike "PA-P-FW-*") {                                               #All other routes
+                                $match = $currentRoutes | Where-Object {
+                                    $_.Name -eq $dbRoute.Name -and
+                                    $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
+                                    $_.NextHopType -eq $dbRoute.NextHopType -and
+                                    $_.NextHopIpAddress -eq $GatewayIP
+                                }
                             }
                         
                             if (-not $match) {
                                 # Write-Output "Missing route found: $($dbRoute.Name)"
                                 $missingRoutes += $dbRoute.Name
+                                $RT_Compliance = "Route table non-complaint"
                             }
                         }
                     }
@@ -107,7 +133,7 @@ function Validate-RouteTables {
                             ResourceGroupName = $routeTable.ResourceGroupName
                             RouteTableName = $routeTable.Name
                             RG_Compliance = $RG_Compliance
-                            # RT_Compliance = $RT_Compliance
+                            RT_Compliance = $RT_Compliance
                             MissingRoutes = $missingRoutes -join ", "
                         }
                     } else { 
