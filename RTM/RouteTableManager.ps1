@@ -13,10 +13,10 @@ param (
     [string]$routeTableName,
 
     [Parameter(Mandatory=$false)]
-    [array]$customRoutes,
+    [array]$customRoutes
 
-    [Parameter(Mandatory=$false)]
-    [string]$LocalSubnetAddressPrefix
+    # [Parameter(Mandatory=$false)]
+    # [string]$LocalSubnetAddressPrefix
 )
 
 try
@@ -39,7 +39,7 @@ function Add-StandardRoutes {
     param ([Parameter(Mandatory = $true)] $RouteTableObj)
     Write-Output "Adding standard routes to Route Table: $($RouteTableObj.Name)."
 
-    if (($RouteTableObj.Name -notcontains "*-PALO-*") -and ($RouteTableObj.Name -notcontains "RT-PROD-GW-*")){
+    if (($RouteTableObj.Name -notlike "*-PALO-*") -and ($RouteTableObj.Name -notlike "RT-PROD-GW-*")){
     
         $RTResourceObj = Get-AzRouteTable -Name $routeTableName
         $RouteTableObJ = Get-AzRouteTable -ResourceGroupName $RTResourceObj.ResourceGroupName -Name $RTResourceObj.Name
@@ -117,7 +117,9 @@ function Add-LocalRoutes {
     Write-Output "Adding local routes to Route Table: $($RouteTableObj.Name)"
 
     $RouteTableObj = Get-AzRouteTable -Name $routeTableName
-    Add-AzRouteConfig -Name "LocalSubnet" -AddressPrefix $LocalSubnetAddressPrefix -NextHopType "VnetLocal" -RouteTable  $RouteTableObj
+    $vNet = Get-AzVirtualNetwork -ResourceGroupName $RouteTableObj.ResourceGroupName | Where-Object { $_.Subnets.Name -eq ($routeTableName -replace "^RT-", "") }
+    $subnet = Get-AzVirtualNetworkSubnetConfig -VirtualNetwork $vNet -Name ($routeTableName -replace "^RT-", "")
+    Add-AzRouteConfig -Name "LocalSubnet" -AddressPrefix $subnet.AddressPrefix[0] -NextHopType "VnetLocal" -RouteTable  $RouteTableObj
     Set-AzRouteTable -RouteTable $RouteTableObj
 }
 
@@ -178,9 +180,9 @@ else {
 
                 Add-StandardRoutes -RouteTable $RouteTableObj
 
-                if ($LocalSubnetAddressPrefix) {
+                # if ($LocalSubnetAddressPrefix) {
                     Add-LocalRoutes -RouteTable $RouteTableObj
-                }
+                # }
 
                 if ($customRoutes) {
                     Add-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
