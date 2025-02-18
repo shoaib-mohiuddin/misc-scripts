@@ -14,9 +14,6 @@ param (
 
     [Parameter(Mandatory=$false)]
     [array]$customRoutes
-
-    # [Parameter(Mandatory=$false)]
-    # [string]$LocalSubnetAddressPrefix
 )
 
 try
@@ -86,7 +83,7 @@ function Add-StandardRoutes {
         # Get the vNet in which the RT exists
         $vNet = (Get-AzVirtualNetwork -ResourceGroupName $resourceGroup | Where-Object { $_.Subnets.Name -eq ($routeTableName -replace "^RT-", "") }).Name
     
-        Foreach ($dbroute in $routedbreturn) {
+        foreach ($dbroute in $routedbreturn) {
             if ($RouteTableObJ.Routes.AddressPrefix -notcontains $dbroute.AddressPrefix) {
                 if (($dbroute.Region -eq 'all') -or ($dbroute.Region -eq $RouteTableObJ.Location)) {
 
@@ -180,9 +177,7 @@ else {
 
                 Add-StandardRoutes -RouteTable $RouteTableObj
 
-                # if ($LocalSubnetAddressPrefix) {
-                    Add-LocalRoutes -RouteTable $RouteTableObj
-                # }
+                Add-LocalRoutes -RouteTable $RouteTableObj
 
                 if ($customRoutes) {
                     Add-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
