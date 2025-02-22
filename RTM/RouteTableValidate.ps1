@@ -15,6 +15,13 @@
 .PARAMETER None
   This runbook does not accept any parameters.
 
+.INPUTS
+  N/A - No Inputs Required.
+
+.OUTPUTS
+  - Console output of runbook execution progress
+  - HTML formatted email report containing non-compliant route tables
+
 .NOTES
   Automation Account: AUTOACC-PROD-IT-OPS
   Runbook:            RouteTableAudit
@@ -30,16 +37,11 @@
   Email Dependencies:
   - Uses Azure Communication Services AUTOACC-PROD-IT-OPS-COMM-SERVICE for email delivery
 
-.OUTPUTS
-  - Console output of runbook execution progress
-  - HTML formatted email report containing non-compliant route tables
-
 .LINK
   https://cloudreach.jira.com/wiki/spaces/CO/pages/5368283168/Route+Table+Validation
 #>
 
 #---------------------------------------------------------[Initialisations]--------------------------------------------------------
-
 try
 {
     "Logging in to Azure..."

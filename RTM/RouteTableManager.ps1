@@ -29,6 +29,12 @@
   customRoutes      : Optional. Array of custom routes to be added or deleted.
                       Each route should contain: routeName, addressPrefix, nextHopType, and nextHopIpAddress.
 
+.INPUTS
+  See PARAMETER
+
+.OUTPUTS
+  - Console output of runbook execution progress
+
 .NOTES
   Automation Account: AUTOACC-PROD-IT-OPS
   Runbook:            RouteTableManager
@@ -40,9 +46,6 @@
   - Database: DB-PROD-OPS-AUTOMATION-NE01
   - Table: dbo.Routes (contains standard routes configuration)
   - Database credential 'sql-prod-it-automation-ne01.database.windows.net' stored in Automation Account Credentials
-
-.OUTPUTS
-  - Console output of runbook execution progress
 
 .LINK
   https://cloudreach.jira.com/wiki/spaces/CO/pages/5368283158/Route+Table+Management
