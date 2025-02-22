@@ -1,3 +1,54 @@
+<#
+.SYNOPSIS
+  Azure Automation Account runbook that manages Azure Route Tables including creation, deletion, and 
+  updation of routes and route tables.
+
+.DESCRIPTION
+  This script provides comprehensive management for Azure Route Tables in DatacenterExtension subscriptions.
+  It supports multiple operations including:
+  - Creating new route tables with standard, local, and custom routes
+  - Updating existing route tables with standard routes
+  - Adding custom routes to existing route tables
+  - Deleting specific routes from route tables
+  - Deleting route tables
+
+  The script automatically handles:
+  - Azure authentication using managed identity
+  - Region-specific gateway configurations
+  - Standard route configurations based on hub locations
+  - Subnet associations and de-associations
+
+.PARAMETER mode, subscriptionName, resourceGroup, routeTableName, customRoutes
+  mode              : Mandatory. Specifies the execution mode.
+                      Valid values: "create", "update", "addRoutes", "deleteRoutes", "delete"
+  subscriptionName  : Mandatory. The name of the Azure subscription where the route table operations will be performed.
+                      Must be tagged as "DatacenterExtension" subscription type.
+  resourceGroup     : Mandatory. The name of the resource group where the route table exists or will be created.
+                      For create operations, must contain "*-NETWORK-*" in the name.
+  routeTableName    : Mandatory. The name of the route table to manage.
+  customRoutes      : Optional. Array of custom routes to be added or deleted.
+                      Each route should contain: routeName, addressPrefix, nextHopType, and nextHopIpAddress.
+
+.NOTES
+  Automation Account: AUTOACC-PROD-IT-OPS
+  Runbook:            RouteTableManager
+  Author:             Shoaib Mohiuddin
+  Purpose:            Route Table CI - RITM0026549
+
+  Database Dependencies:
+  - Server: sql-prod-it-automation-ne01.database.windows.net
+  - Database: DB-PROD-OPS-AUTOMATION-NE01
+  - Table: dbo.Routes (contains standard routes configuration)
+  - Database credential 'sql-prod-it-automation-ne01.database.windows.net' stored in Automation Account Credentials
+
+.OUTPUTS
+  - Console output of runbook execution progress
+
+.LINK
+  https://cloudreach.jira.com/wiki/spaces/CO/pages/5368283158/Route+Table+Management
+#>
+
+#---------------------------------------------------------[Initialisations]--------------------------------------------------------
 param (
     [Parameter(Mandatory=$true)]
     [ValidateSet("create", "update", "addRoutes", "deleteRoutes", "delete")]
@@ -25,6 +76,8 @@ catch {
     Write-Error -Message $_.Exception
     throw $_.Exception
 }
+
+#-----------------------------------------------------------[Functions]------------------------------------------------------------
 
 function funccullspaces($param) {
     $param = $param.trim()
@@ -142,6 +195,7 @@ function Delete-CustomRoutes {
     Set-AzRouteTable -RouteTable $RouteTableObj
 }
 
+#-----------------------------------------------------------[Execution]------------------------------------------------------------
 
 $mode = funccullspaces($mode)
 $routeTableName = funccullspaces($routeTableName)
@@ -156,7 +210,7 @@ $Subscription = Get-AzSubscription -SubscriptionName $subscriptionName
 $Tags = $Subscription.Tags
 
 if ($Tags["SubscriptionType"] -ne "DatacenterExtension") {
-    Write-Output "Subscription $subscriptionName is not tagged with SubscriptionType=DatacenterExtension. Exiting."
+    Write-Error "Subscription $subscriptionName is not tagged with SubscriptionType=DatacenterExtension. Exiting."
     return
 } 
 else {
@@ -198,7 +252,7 @@ else {
                 if ($customRoutes) {
                     Add-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
                 } else {
-                    Write-Error "No custom routes provided for 'addRoutes' mode."
+                    Write-Error "No routes provided for 'addRoutes' mode."
                 }
             } else {
                 Write-Error "Route Table $routeTableName does not exist."
@@ -211,7 +265,7 @@ else {
                 if ($customRoutes) {
                     Delete-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
                 } else {
-                    Write-Error "No custom routes provided for 'deleteRoutes' mode."
+                    Write-Error "No routes provided for 'deleteRoutes' mode."
                 }
             } else {
                 Write-Error "Route Table $routeTableName does not exist."

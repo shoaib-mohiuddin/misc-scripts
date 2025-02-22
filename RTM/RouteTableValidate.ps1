@@ -1,4 +1,44 @@
-# Import-Module Az.Communication -Force
+<#
+.SYNOPSIS
+  Azure Automation runbook to validate route tables and generate a compliance report.
+
+.DESCRIPTION
+  This script performs validation of route tables across all DatacenterExtension
+  subscriptions. It checks for:
+  - Correct resource group placement (resource group name must have '*-NETWORK-*' )
+  - Missing standard routes as defined in the database
+  - Extra routes not defined in the standard configuration
+    
+  The runbook generates a detailed compliance report and emails it to specified recipients using
+  Azure Communication Services.
+
+.PARAMETER None
+  This runbook does not accept any parameters.
+
+.NOTES
+  Automation Account: AUTOACC-PROD-IT-OPS
+  Runbook:            RouteTableAudit
+  Author:             Shoaib Mohiuddin
+  Purpose:            Route Table CI - RITM0026549
+
+  Database Dependencies:
+  - Server: sql-prod-it-automation-ne01.database.windows.net
+  - Database: DB-PROD-OPS-AUTOMATION-NE01
+  - Table: dbo.Routes (contains standard routes configuration)
+  - Database credential 'sql-prod-it-automation-ne01.database.windows.net' stored in Automation Account Credentials
+
+  Email Dependencies:
+  - Uses Azure Communication Services AUTOACC-PROD-IT-OPS-COMM-SERVICE for email delivery
+
+.OUTPUTS
+  - Console output of runbook execution progress
+  - HTML formatted email report containing non-compliant route tables
+
+.LINK
+  https://cloudreach.jira.com/wiki/spaces/CO/pages/5368283168/Route+Table+Validation
+#>
+
+#---------------------------------------------------------[Initialisations]--------------------------------------------------------
 
 try
 {
@@ -9,6 +49,8 @@ catch {
     Write-Error -Message $_.Exception
     throw $_.Exception
 }
+
+#-----------------------------------------------------------[Functions]------------------------------------------------------------
 
 function Validate-RouteTables {
     param ( [Parameter(Mandatory = $true)] [ref] $RT_Report )
@@ -146,6 +188,7 @@ function Validate-RouteTables {
     }
 }
 
+#-----------------------------------------------------------[Execution]------------------------------------------------------------
 
 # $date = get-date -format "dd-MM-yyyy"
 $sqlcreds = Get-AutomationPSCredential -Name 'sql-prod-it-automation-ne01.database.windows.net'
