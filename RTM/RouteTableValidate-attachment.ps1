@@ -1,5 +1,3 @@
-# Import-Module Az.Communication -Force
-
 try
 {
     "Logging in to Azure..."
@@ -80,8 +78,6 @@ function Validate-RouteTables {
             $missingRoutes = @()
             $extraRoutes = @()
 
-
-            Write-Output "Checking for missing routes..."
             foreach ($dbRoute in $dbRoutes) {
                 if (($dbRoute.Region -eq 'all') -or ($dbRoute.Region -eq $routeTable.Location)) {
                     if (($dbRoute.Name -like "PA-P-FW-*") -and ($hubVNets -contains $vNet)) {               #Hub vNet FW trust routes
@@ -100,7 +96,23 @@ function Validate-RouteTables {
                             $_.NextHopIpAddress -eq ($dbroute.AddressPrefix -replace "/\d+$", "")
                         }
                     }
-                    if ($dbRoute.Name -notlike "PA-P-FW-*") {                                               #All other routes
+                    if ($dbRoute.Name -like "*-PALO-MAN-*") {
+                        $match = $currentRoutes | Where-Object {
+                            $_.Name -eq $dbRoute.Name -and
+                            $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
+                            $_.NextHopType -eq $dbRoute.NextHopType #-and
+                            # $_.NextHopIpAddress -eq $null
+                        }
+                    }
+                    if ($dbRoute.Name -like "*-PALO-CLIENT-VPN-POOL-*") {
+                        $match = $currentRoutes | Where-Object {
+                            $_.Name -eq $dbRoute.Name -and
+                            $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
+                            $_.NextHopType -eq $dbRoute.NextHopType -and
+                            $_.NextHopIpAddress -eq $dbRoute.NetxtHopIP
+                        }
+                    }
+                    if (($dbRoute.Name -notlike "PA-P-FW-*") -and ($dbRoute.Name -notlike "*-PALO-MAN-*") -and ($dbRoute.Name -notlike "*-PALO-CLIENT-VPN-POOL-*")) {                                               #All other routes
                         $match = $currentRoutes | Where-Object {
                             $_.Name -eq $dbRoute.Name -and
                             $_.AddressPrefix -eq $dbRoute.AddressPrefix -and

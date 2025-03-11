@@ -27,7 +27,14 @@
                       For create operations, must contain "*-NETWORK-*" in the name.
   routeTableName    : Mandatory. The name of the route table to manage.
   customRoutes      : Optional. Array of custom routes to be added or deleted.
-                      Each route should contain: routeName, addressPrefix, nextHopType, and nextHopIpAddress.
+                      E.g, [{"routeName": "CustomRoute1", "addressPrefix": "addressprefix1", "nextHopType": "nexthoptype1", "nextHopIpAddress": "nexthopIp1"}]
+                      1. Each route must have routeName, addressPrefix, and nextHopType properties.
+                      2. routeName must be unique.
+                      3. addressPrefix must be in CIDR notation (e.g., 10.0.0.0/24).
+                      4. nextHopType must be one of: 'VirtualAppliance', 'VnetLocal', 'Internet', 'VirtualNetworkGateway', 'None'
+                      5. nextHopIpAddress is required when nextHopType is 'VirtualAppliance'
+                      6. nextHopIpAddress must be a valid IPv4 address (e.g., 10.0.0.0)
+
 
 .INPUTS
   See PARAMETER
@@ -39,7 +46,7 @@
   Automation Account: AUTOACC-PROD-IT-OPS
   Runbook:            RouteTableManager
   Author:             Shoaib Mohiuddin
-  Purpose:            Route Table CI - RITM0026549
+  Purpose:            Route Table CI Project - RITM0026549
 
   Database Dependencies:
   - Server: sql-prod-it-automation-ne01.database.windows.net
@@ -137,7 +144,8 @@ function Add-StandardRoutes {
         $hubVNets = @("VNET1-EU-North", "VNET1-EU-West", "VNET-PROD-UKS01", "VNET-HSL-INFRA-PROD-SA01", "VNET-HSL-INFRA-PROD-EA01", "VNET-HGS-INFRA-PROD-AE01", "VNET-HGS-INFRA-PROD-UC01", "VNET-HGS-INFRA-PROD-UE01")
         
         # Get the vNet in which the RT exists
-        $vNet = (Get-AzVirtualNetwork -ResourceGroupName $resourceGroup | Where-Object { $_.Subnets.Name -eq ($routeTableName -replace "^RT-", "") }).Name
+        # $vNet = (Get-AzVirtualNetwork -ResourceGroupName $resourceGroup | Where-Object { $_.Subnets.Name -eq ($routeTableName -replace "^RT-", "") }).Name
+        $vNet = ($RouteTableObJ.SubnetsText | ConvertFrom-Json).Id -split '/' | Select-Object -Index 8
     
         foreach ($dbroute in $routedbreturn) {
             if ($RouteTableObJ.Routes.AddressPrefix -notcontains $dbroute.AddressPrefix) {
@@ -146,14 +154,17 @@ function Add-StandardRoutes {
                     if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -eq 'regionspecific' )) {
                         Add-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $GatewayIP -RouteTable $RouteTableObJ
                     }            
-                    if (($dbroute.NextHopType -eq "VnetLocal") -and ($dbroute.NetxtHopIP -eq 'notapplicable' )) {
+                    if (($dbroute.NextHopType -eq "VnetLocal") -and ($dbroute.NetxtHopIP -eq 'notapplicable' ) -and ($dbRoute.Name -like "PA-P-FW-*")) {
                         if ($hubVNets -contains $vNet) {
-                            Write-Output "The VNet '$vNet' is a hub VNet."
+                            Write-Output "The VNet '$vNet' is a Hub VNet."
                             Add-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -RouteTable $RouteTableObJ
                         } else {
-                            Write-Output "The VNet '$vNet' is not a hub VNet."
+                            Write-Output "The VNet '$vNet' is a Spoke VNet."
                             Add-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType "VirtualAppliance" -NextHopIpAddress ($dbroute.AddressPrefix -replace "/\d+$", "") -RouteTable $RouteTableObJ
                         }
+                    }
+                    if (($dbroute.NextHopType -eq "VnetLocal") -and ($dbroute.NetxtHopIP -eq 'notapplicable' ) -and ($dbRoute.Name -like "*-PALO-MAN-*")) {
+                        Add-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -RouteTable  $RouteTableObJ
                     }
                     if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -ne 'regionspecific' )) {
                         Add-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $dbroute.NetxtHopIP -RouteTable  $RouteTableObJ
@@ -174,6 +185,10 @@ function Add-LocalRoutes {
     $subnet = Get-AzVirtualNetworkSubnetConfig -VirtualNetwork $vNet -Name ($routeTableName -replace "^RT-", "")
     Add-AzRouteConfig -Name "LocalSubnet" -AddressPrefix $subnet.AddressPrefix[0] -NextHopType "VnetLocal" -RouteTable  $RouteTableObj
     Set-AzRouteTable -RouteTable $RouteTableObj
+
+    # Associate RT with subnet
+    $subnet.RouteTable = $RouteTableObj
+    $vNet | Set-AzVirtualNetwork
 }
 
 function Add-CustomRoutes {
@@ -182,7 +197,12 @@ function Add-CustomRoutes {
 
     $RouteTableObj = Get-AzRouteTable -Name $routeTableName
     foreach ($customRoute in $customRoutes) {
-        Add-AzRouteConfig -Name $customRoute.routeName -AddressPrefix $customRoute.addressPrefix -NextHopType $customRoute.nextHopType -NextHopIpAddress $customRoute.nextHopIpAddress -RouteTable  $RouteTableObj
+    	if ($RouteTableObj.Routes.Name -contains $customRoute.routeName) {
+    		Set-AzRouteConfig -Name $customRoute.routeName -AddressPrefix $customRoute.addressPrefix -NextHopType $customRoute.nextHopType -NextHopIpAddress $customRoute.nextHopIpAddress -RouteTable  $RouteTableObj
+    	} 
+    	else {
+    		Add-AzRouteConfig -Name $customRoute.routeName -AddressPrefix $customRoute.addressPrefix -NextHopType $customRoute.nextHopType -NextHopIpAddress $customRoute.nextHopIpAddress -RouteTable  $RouteTableObj
+    	}
     }
     Set-AzRouteTable -RouteTable $RouteTableObj
 }
@@ -232,20 +252,13 @@ else {
                 $RouteTableObj = New-AzRouteTable -Name $routeTableName -ResourceGroupName $resourceGroup -Location (Get-AzResourceGroup -Name $resourceGroup).Location 
                 Write-Output "Route Table created successfully."
 
-                Add-StandardRoutes -RouteTable $RouteTableObj
+                Add-LocalRoutes -RouteTable $RouteTableObj # Add LocalSubnet route and associate RT-Subnet. This is done first because it will be helpful in adding correct FW routes by #148 instead of #147
 
-                Add-LocalRoutes -RouteTable $RouteTableObj
+                Add-StandardRoutes -RouteTable $RouteTableObj
 
                 if ($customRoutes) {
                     Add-CustomRoutes -RouteTable $RouteTableObj -CustomRoutes $customRoutes
                 }
-
-                # Associate RT to a subnet
-                $vNet = Get-AzVirtualNetwork -ResourceGroupName $resourceGroup | Where-Object { $_.Subnets.Name -eq ($routeTableName -replace "^RT-", "") }
-                $subnetObj = Get-AzVirtualNetworkSubnetConfig -Name ($routeTableName -replace "^RT-", "") -VirtualNetwork $vNet
-                $subnetObj.RouteTable = $RouteTableObj
-                $vNet | Set-AzVirtualNetwork
-        
             } 
         }
 

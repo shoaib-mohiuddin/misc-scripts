@@ -26,7 +26,7 @@
   Automation Account: AUTOACC-PROD-IT-OPS
   Runbook:            RouteTableAudit
   Author:             Shoaib Mohiuddin
-  Purpose:            Route Table CI - RITM0026549
+  Purpose:            Route Table CI Project - RITM0026549
 
   Database Dependencies:
   - Server: sql-prod-it-automation-ne01.database.windows.net
@@ -73,7 +73,7 @@ function Validate-RouteTables {
                 $RG_Compliance = "Correct resource group"
             }
             
-            Write-Output "Validating route table $($routeTable.Name) ..."
+            Write-Output "Validating routes in route table $($routeTable.Name) ..."
             switch -Wildcard ($routeTable.location) {
                 "NorthEurope" {
                     $Hub = "EU-HUB"
@@ -124,8 +124,6 @@ function Validate-RouteTables {
             $missingRoutes = @()
             $extraRoutes = @()
 
-
-            Write-Output "Checking for missing routes..."
             foreach ($dbRoute in $dbRoutes) {
                 if (($dbRoute.Region -eq 'all') -or ($dbRoute.Region -eq $routeTable.Location)) {
                     if (($dbRoute.Name -like "PA-P-FW-*") -and ($hubVNets -contains $vNet)) {               #Hub vNet FW trust routes
@@ -144,7 +142,23 @@ function Validate-RouteTables {
                             $_.NextHopIpAddress -eq ($dbroute.AddressPrefix -replace "/\d+$", "")
                         }
                     }
-                    if ($dbRoute.Name -notlike "PA-P-FW-*") {                                               #All other routes
+                    if ($dbRoute.Name -like "*-PALO-MAN-*") {
+                        $match = $currentRoutes | Where-Object {
+                            $_.Name -eq $dbRoute.Name -and
+                            $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
+                            $_.NextHopType -eq $dbRoute.NextHopType #-and
+                            # $_.NextHopIpAddress -eq $null
+                        }
+                    }
+                    if ($dbRoute.Name -like "*-PALO-CLIENT-VPN-POOL-*") {
+                        $match = $currentRoutes | Where-Object {
+                            $_.Name -eq $dbRoute.Name -and
+                            $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
+                            $_.NextHopType -eq $dbRoute.NextHopType -and
+                            $_.NextHopIpAddress -eq $dbRoute.NetxtHopIP
+                        }
+                    }
+                    if (($dbRoute.Name -notlike "PA-P-FW-*") -and ($dbRoute.Name -notlike "*-PALO-MAN-*") -and ($dbRoute.Name -notlike "*-PALO-CLIENT-VPN-POOL-*")) {                                               #All other routes
                         $match = $currentRoutes | Where-Object {
                             $_.Name -eq $dbRoute.Name -and
                             $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
@@ -174,17 +188,17 @@ function Validate-RouteTables {
             }
 
             if ($missingRoutes -or $extraRoutes) {
-                Write-Output "Missing routes found"
+                Write-Output "Missing/Incorrect routes found"
                 $RT_Report.Value += [PSCustomObject]@{
                     SubscriptionName = $subscription.Name
                     ResourceGroupName = $routeTable.ResourceGroupName
                     RouteTableName = $routeTable.Name
                     RG_Compliance = $RG_Compliance
-                    MissingRoutes = $missingRoutes -join ", "   # newline character - "`n"
-                    ExtraRoutes = $extraRoutes -join ", "   # newline character - "`n"
+                    MissingRoutes = $missingRoutes -join ", "
+                    ExtraRoutes = $extraRoutes -join ", "
                 }
             } else { 
-                Write-Output "No missing routes in $($routeTable.Name)" 
+                Write-Output "No missing/incorrect routes in $($routeTable.Name)" 
             }
         }
     }
@@ -233,7 +247,7 @@ $message = @{
 try {
     $poller = Send-AzEmailServicedataEmail -Message $Message -endpoint $endpoint # It should be $Message and not $message as with latter it is failing
     $result = $poller.Result
-    Write-Output "Email sent successfully."
+    Write-Output "Email sent."
 } catch {
     Write-Error "Error sending email: $_"
 }
