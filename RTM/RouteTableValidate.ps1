@@ -24,7 +24,7 @@
 
 .NOTES
   Automation Account: AUTOACC-PROD-IT-OPS
-  Runbook:            RouteTableAudit
+  Runbook:            RouteTableValidate
   Author:             Shoaib Mohiuddin
   Purpose:            Route Table CI Project - RITM0026549
 
