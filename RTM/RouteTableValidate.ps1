@@ -64,14 +64,14 @@ function Validate-RouteTables {
         Set-AzContext -SubscriptionId $subscription.Id
         $routeTables = Get-AzRouteTable | Where-Object { $_.Name -notlike "*-PALO-*" -and $_.Name -notlike "RT-PROD-GW-*" }
         foreach ($routeTable in $routeTables) {
-            if ($routeTable.ResourceGroupName -notlike "*-NETWORK-*") {
-                Write-Output "$($routeTable.Name) is in Incorrect resource group $($routeTable.ResourceGroupName)"
-                $RG_Compliance = "Incorrect resource group"
-            } 
-            else {
-                Write-Output "$($routeTable.Name) is in Correct resource group $($routeTable.ResourceGroupName)"
-                $RG_Compliance = "Correct resource group"
-            }
+            # if ($routeTable.ResourceGroupName -notlike "*-NETWORK-*") {
+            #     Write-Output "$($routeTable.Name) is in Incorrect resource group $($routeTable.ResourceGroupName)"
+            #     $RG_Compliance = "Incorrect resource group"
+            # } 
+            # else {
+            #     Write-Output "$($routeTable.Name) is in Correct resource group $($routeTable.ResourceGroupName)"
+            #     $RG_Compliance = "Correct resource group"
+            # }
             
             Write-Output "Validating routes in route table $($routeTable.Name) ..."
             switch -Wildcard ($routeTable.location) {
@@ -122,7 +122,7 @@ function Validate-RouteTables {
             $currentRoutes = $routeTable.Routes
             # Compare routes
             $missingRoutes = @()
-            $extraRoutes = @()
+            # $extraRoutes = @()
 
             foreach ($dbRoute in $dbRoutes) {
                 if (($dbRoute.Region -eq 'all') -or ($dbRoute.Region -eq $routeTable.Location)) {
@@ -173,29 +173,31 @@ function Validate-RouteTables {
                 }
             }
 
-            foreach ($currentRoute in $currentRoutes) {
-                if (($currentRoute.Name -notlike "PA-P-FW-*") -and ($currentRoute.Name -notlike "LocalSubnet")) {
-                    $match = $dbRoutes | Where-Object {
-                        $_.Name -eq $currentRoute.Name # -and
-                        # $_.AddressPrefix -eq $currentRoute.AddressPrefix -and
-                        # $_.NextHopType -eq $currentRoute.NextHopType
-                    }
+            # foreach ($currentRoute in $currentRoutes) {
+            #     if (($currentRoute.Name -notlike "PA-P-FW-*") -and ($currentRoute.Name -notlike "LocalSubnet")) {
+            #         $match = $dbRoutes | Where-Object {
+            #             $_.Name -eq $currentRoute.Name # -and
+            #             # $_.AddressPrefix -eq $currentRoute.AddressPrefix -and
+            #             # $_.NextHopType -eq $currentRoute.NextHopType
+            #         }
                 
-                    if (-not $match) {
-                        $extraRoutes += $currentRoute.Name
-                    }
-                }
-            }
+            #         if (-not $match) {
+            #             $extraRoutes += $currentRoute.Name
+            #         }
+            #     }
+            # }
 
-            if ($missingRoutes -or $extraRoutes) {
+            # if ($missingRoutes -or $extraRoutes) {
+            if ($missingRoutes) {
                 Write-Output "Missing/Incorrect routes found"
                 $RT_Report.Value += [PSCustomObject]@{
                     SubscriptionName = $subscription.Name
                     ResourceGroupName = $routeTable.ResourceGroupName
                     RouteTableName = $routeTable.Name
-                    RG_Compliance = $RG_Compliance
+                    # RG_Compliance = $RG_Compliance                # RG_Compliance is not required anymore
                     MissingRoutes = $missingRoutes -join ", "
-                    ExtraRoutes = $extraRoutes -join ", "
+                    # ExtraRoutes = $extraRoutes -join ", "         # ExtraRoutes is not required as it is appearing to be noise            
+
                 }
             } else { 
                 Write-Output "No missing/incorrect routes in $($routeTable.Name)" 
@@ -224,6 +226,8 @@ TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black;}
 </style>
 "@
 
+# Ref doc: https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/email/send-email?tabs=windows%2Cconnection-string%2Csend-email-and-get-status-async%2Csync-client&pivots=platform-powershell
+
 $body = $RT_Report | ConvertTo-Html -Head $Header | Out-String
 $emailFrom = "AzureAutomation@service.howdengrp.com"
 $emailTo = "shoaib.mohiuddin@cloudreach.com"
@@ -234,12 +238,23 @@ $emailRecipientTo = @(
    @{
         Address = $emailTo
         DisplayName = $toName
-    }
+    }#,
+#    @{
+#         Address = "<jake.orchard@eviden.com>"
+#         DisplayName = "Jake Orchard"
+#     }
 )
+# $emailRecipientCc = @(
+#    @{
+#         Address = "<emailalias@emaildomain.com>"
+#         DisplayName = "Email DisplayName"
+#     }
+# )
 
 $message = @{
     ContentSubject = $subject
     RecipientTo = @($emailRecipientTo)
+    # RecipientCc = @($emailRecipientCc)
     SenderAddress = $emailFrom
     ContentHtml = $body
 }
