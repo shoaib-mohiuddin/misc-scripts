@@ -220,8 +220,8 @@ else {
   # Handle operations based on the selected mode
   switch ($mode) {
     "create" {
-      if ($resourceGroup -notlike "*-NETWORK-*") {
-        Write-Error "Resource group name does not contain '*-NETWORK-*'. Operation not permitted."
+      if ($resourceGroup -notmatch "(-NETWORK-|^Hyperion|[-]Network|[-]NET[-]|-SKENSE-)") {
+        Write-Error "Operation not permitted. Resource group name must include one of the following patterns: *-NETWORK-*, *-Network, *-NET-*, Hyperion*, or *-SKENSE-*."
         break
       } 
       else {
