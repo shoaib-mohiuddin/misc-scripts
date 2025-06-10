@@ -1,0 +1,50 @@
+// timeseries {
+//   free = avg(system.filesystem.usage, filter: {(state == "free") }),
+//   used = avg(system.filesystem.usage, filter: {(state == "used") })
+// }, by: { host.name, csp_hostname, mountpoint }
+// | fields host.name, csp_hostname, mountpoint, 
+//          avgfree_gb=(arrayAvg(free)/1073741824), 
+//          avgused_gb=(arrayAvg(used)/1073741824)
+// | fieldsAdd avgfree_gb = round(avgfree_gb, decimals: 2), 
+//              avgused_gb = round(avgused_gb, decimals: 2),
+//              total_gb = round((avgfree_gb + avgused_gb), decimals: 2)
+// | fieldsAdd percentUsed = round((avgused_gb / total_gb) * 100)
+// | fieldsAdd tags = lookup([
+//    fetch dt.entity.azure_vm, from: -24h | fieldsAdd tags | fieldsRemove id
+//    ],
+//    sourceField: csp_hostname,
+//    lookupField: entity.name)
+// | parse tostring(tags), "ld:key1 '[Azure]Environment:' ld:Environment '\"'"
+// | parse tostring(tags), "ld:key3 '[Azure]Division:' ld:Division '\"'"
+// | fieldsAdd Environment = if(IsNull(Environment), "Not configured", else: Environment)
+// | fieldsAdd Division = if(IsNull(Division), "Not configured", else: Division)
+// | fieldsRemove tags, key1, key3
+// | filter percentUsed <= 30
+// | sort host.name, mountpoint
+
+
+timeseries {
+  free = avg(system.paging.usage, filter: {(state == "free") }),
+  used = avg(system.paging.usage, filter: {(state == "used") })
+}, by: {csp_hostname,os.type,device}
+| fields csp_hostname, device,
+         avgfree_gb=(arrayAvg(free)/1073741824), 
+         avgused_gb=(arrayAvg(used)/1073741824)
+| fieldsAdd avgfree_gb = round(avgfree_gb, decimals: 2), 
+             avgused_gb = round(avgused_gb, decimals: 2),
+             total_gb = round((avgfree_gb + avgused_gb), decimals: 2)
+| fieldsAdd percentUsed = round((avgused_gb / total_gb) * 100)  
+| fieldsAdd tags = lookup([
+   fetch dt.entity.azure_vm, from: -24h | fieldsAdd tags | fieldsRemove id
+   ],
+   sourceField: csp_hostname,
+   lookupField: entity.name)
+| parse tostring(tags), "ld:key1 '[Azure]Environment:' ld:Environment '\"'"
+| parse tostring(tags), "ld:key3 '[Azure]Division:' ld:Division '\"'"
+| fieldsAdd Environment = if(IsNull(Environment), "Not configured", else: Environment)
+| fieldsAdd Division = if(IsNull(Division), "Not configured", else: Division)
+| fieldsRemove tags, key1, key3
+// | filter percentUsed <= 30
+| sort csp_hostname, device
+
+ 
