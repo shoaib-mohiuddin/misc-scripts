@@ -48,3 +48,39 @@ timeseries {
 | sort csp_hostname, device
 
  
+// Below queries examples using both paging and filesystem metrics
+
+ timeseries usage=avg(system.paging.usage), by:{csp_hostname, os.type, device}
+| fieldsAdd metric_type = "paging"
+| append [
+    timeseries usage=avg(system.filesystem.usage), by:{csp_hostname, os.type, mountpoint}
+    | fieldsAdd metric_type = "filesystem"
+]
+| sort csp_hostname
+
+
+
+timeseries usage=avg(system.paging.usage), by:{csp_hostname, os.type, device}
+| fieldsAdd metric_type = "paging", target = device
+| fieldsRemove device
+| append [
+  timeseries usage=avg(system.filesystem.usage), by:{csp_hostname, os.type, mountpoint}
+  | fieldsAdd metric_type = "filesystem", target = mountpoint
+  | fieldsRemove mountpoint
+]
+| sort csp_hostname
+
+
+
+timeseries usage=avg(system.paging.usage), by:{csp_hostname, os.type, device}
+| fieldsAdd metric_type = "paging", target = device, volume_name = ""
+| fieldsRemove device
+| append [
+  timeseries usage=avg(system.filesystem.usage), by:{csp_hostname, os.type, mountpoint, device}
+  | fieldsAdd metric_type = "filesystem", target = mountpoint, volume_name = device
+  | fieldsRemove mountpoint, device
+]
+| filter os.type == "windows"
+| sort csp_hostname
+
+
