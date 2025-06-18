@@ -19,8 +19,8 @@ param (
   [array]$customRoutes,
 
   [Parameter(Mandatory=$false)]
-  [ValidateSet("GDLSpoke", "NoDefault", "OutOfScope")]
-  [string]$TagRouteTableManager
+  [ValidateSet("NoDefault", "OutOfScope")]
+  [string]$tagRouteTableManager
 
 )
 
@@ -97,9 +97,9 @@ function AddorUpdate-StandardRoutes {
       if ($mode -in @("create", "update")) {
         if ($RouteTableObJ.Routes.AddressPrefix -notcontains $dbroute.AddressPrefix) {
 
-          if ((($dbroute.Region -eq 'all') -or ($dbroute.Region -eq $RouteTableObJ.Location)) -and ($RouteTableObJ.Tag["RouteTableManager"] -ne "GDLSpoke")) {
+          if (($dbroute.Region -eq 'all') -or ($dbroute.Region -eq $RouteTableObJ.Location)) {
 
-            if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -eq 'regionspecific' ) -and ($dbRoute.Name -ne "default") -and ($dbRoute.Name -notlike "RFC*")) {
+            if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -eq 'regionspecific' ) -and ($dbRoute.Name -ne "default")) {
               Add-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $GatewayIP -RouteTable $RouteTableObJ
             } 
             if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -eq 'regionspecific' ) -and ($dbRoute.Name -eq "default") -and ($RouteTableObJ.Tag["RouteTableManager"] -ne "NoDefault")) {
@@ -123,50 +123,45 @@ function AddorUpdate-StandardRoutes {
 
             Set-AzRouteTable -RouteTable $RouteTableObJ
           }
+        }
+      }
+      if ($mode -eq "update") {
+        if (($RouteTableObJ.Routes.AddressPrefix -contains $dbroute.AddressPrefix) -and ($RouteTableObJ.Routes.Name -contains $dbroute.Name)) {
+          if (($dbroute.Region -eq 'all') -or ($dbroute.Region -eq $RouteTableObJ.Location)) {
 
-          if ((($dbroute.Region -eq 'all') -or ($dbroute.Region -eq $RouteTableObJ.Location)) -and ($RouteTableObJ.Tag["RouteTableManager"] -eq "GDLSpoke")) {
+            if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -eq 'regionspecific' ) -and ($dbRoute.Name -ne "default")) {
+              Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $GatewayIP -RouteTable $RouteTableObJ
+            }
+            
+            if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -eq 'regionspecific' ) -and ($dbRoute.Name -eq "default") -and ($RouteTableObJ.Tag["RouteTableManager"] -ne "NoDefault")) {
+              Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $GatewayIP -RouteTable $RouteTableObJ
+            }
 
-            if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -eq 'regionspecific' ) -and ($dbRoute.Name -like "RFC*")) {             # like DATA-* or DATA-HUB-* or GDL-* or GDLSpoke-*
-              Add-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $GatewayIP -RouteTable $RouteTableObJ
+            if (($dbroute.NextHopType -eq "VnetLocal") -and ($dbroute.NetxtHopIP -eq 'notapplicable' ) -and ($dbRoute.Name -like "*-PALO-MAN-*")) {
+              Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -RouteTable  $RouteTableObJ
+            }
+            if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -ne 'regionspecific' )) {
+              Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $dbroute.NetxtHopIP -RouteTable  $RouteTableObJ
             }
 
             Set-AzRouteTable -RouteTable $RouteTableObJ
           }
         }
-      }
-      # if ($mode -eq "update") {
-      #   if (($RouteTableObJ.Routes.AddressPrefix -contains $dbroute.AddressPrefix) -and ($RouteTableObJ.Routes.Name -contains $dbroute.Name)) {
-      #     if (($dbroute.Region -eq 'all') -or ($dbroute.Region -eq $RouteTableObJ.Location)) {
 
-      #       if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -eq 'regionspecific' )) {
-      #         Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $GatewayIP -RouteTable $RouteTableObJ
-      #       }            
-
-      #       if (($dbroute.NextHopType -eq "VnetLocal") -and ($dbroute.NetxtHopIP -eq 'notapplicable' ) -and ($dbRoute.Name -like "*-PALO-MAN-*")) {
-      #         Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -RouteTable  $RouteTableObJ
-      #       }
-      #       if (($dbroute.NextHopType -eq "VirtualAppliance") -and ($dbroute.NetxtHopIP -ne 'regionspecific' )) {
-      #         Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -NextHopIpAddress $dbroute.NetxtHopIP -RouteTable  $RouteTableObJ
-      #       }
-
-      #       Set-AzRouteTable -RouteTable $RouteTableObJ
-      #     }
-      #   }
-
-      #   if (($dbRoute.Region -eq 'all') -or ($dbRoute.Region -eq $RouteTableObJ.Location)) {
-      #     if (($dbroute.NextHopType -eq "VnetLocal") -and ($dbroute.NetxtHopIP -eq 'notapplicable' ) -and ($dbRoute.Name -like "PA-P-FW-*")) {
-      #       if ($hubVNets -contains $vNet) {
-      #         Write-Output "The VNet '$vNet' is a Hub VNet."
-      #         Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -RouteTable $RouteTableObJ
-      #       } else {
-      #         Write-Output "The VNet '$vNet' is a Spoke VNet."
-      #         Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType "VirtualAppliance" -NextHopIpAddress ($dbroute.AddressPrefix -replace "/\d+$", "") -RouteTable $RouteTableObJ
-      #       }
-      #     }
+        if (($dbRoute.Region -eq 'all') -or ($dbRoute.Region -eq $RouteTableObJ.Location)) {
+          if (($dbroute.NextHopType -eq "VnetLocal") -and ($dbroute.NetxtHopIP -eq 'notapplicable' ) -and ($dbRoute.Name -like "PA-P-FW-*")) {
+            if ($hubVNets -contains $vNet) {
+              Write-Output "The VNet '$vNet' is a Hub VNet."
+              Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType $dbroute.NextHopType -RouteTable $RouteTableObJ
+            } else {
+              Write-Output "The VNet '$vNet' is a Spoke VNet."
+              Set-AzRouteConfig -Name $dbroute.Name -AddressPrefix $dbroute.AddressPrefix -NextHopType "VirtualAppliance" -NextHopIpAddress ($dbroute.AddressPrefix -replace "/\d+$", "") -RouteTable $RouteTableObJ
+            }
+          }
           
-      #     Set-AzRouteTable -RouteTable $RouteTableObJ
-      #   }
-      # } 
+          Set-AzRouteTable -RouteTable $RouteTableObJ
+        }
+      } 
     }
   }
 }
@@ -248,8 +243,8 @@ else {
       else {
         # foreach ($routeTableName in $routeTableNames) {
           Write-Output "Creating new Route Table: $routeTableName in Resource Group: $resourceGroup"
-          if ($TagRouteTableManager) {
-            $RouteTableObj = New-AzRouteTable -Name $routeTableName -ResourceGroupName $resourceGroup -Location (Get-AzResourceGroup -Name $resourceGroup).Location -Tag @{ RouteTableManager = $TagRouteTableManager }
+          if ($tagRouteTableManager) {
+            $RouteTableObj = New-AzRouteTable -Name $routeTableName -ResourceGroupName $resourceGroup -Location (Get-AzResourceGroup -Name $resourceGroup).Location -Tag @{ RouteTableManager = $tagRouteTableManager }
           } else {
             $RouteTableObj = New-AzRouteTable -Name $routeTableName -ResourceGroupName $resourceGroup -Location (Get-AzResourceGroup -Name $resourceGroup).Location 
           }
