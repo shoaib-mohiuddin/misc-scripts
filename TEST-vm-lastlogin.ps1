@@ -10,6 +10,7 @@ catch {
 
 $finalResults = @()
 $subs = Get-AzSubscription
+
 foreach ($sub in $subs) {
 
     Select-AzSubscription -SubscriptionId $sub
