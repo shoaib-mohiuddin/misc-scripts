@@ -1,8 +1,15 @@
-$subs = @(
-    "ec057239-e4b9-4f3a-bb91-769e0d722e04"
-)
-$finalResults = @()
+try
+{
+    "Logging in to Azure..."
+    Connect-AzAccount -Identity
+}
+catch {
+    Write-Error -Message $_.Exception
+    throw $_.Exception
+}
 
+$finalResults = @()
+$subs = Get-AzSubscription
 foreach ($sub in $subs) {
 
     Select-AzSubscription -SubscriptionId $sub
