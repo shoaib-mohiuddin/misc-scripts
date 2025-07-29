@@ -1,14 +1,29 @@
-import boto3
+"""
+EBS Unencrypted Volumes Analyzer
+
+This module analyzes EBS volumes in specified AWS regions to identify unencrypted volumes.
+It generates a CSV report with details about each unencrypted volume.
+"""
+
 import csv
+import boto3
 
 
-class ebs_unencrypted_volumes_analyzer:
+class EbsUnencryptedVolumesAnalyzer:
+    """
+    Analyzes EBS volumes to find unencrypted volumes.
+    """
 
     def __init__(self, account_id):
         self.account_id = account_id
         self.unencrypted_volumes = []
 
     def analyze(self, region_list):
+        """
+        Analyzes the specified regions for unencrypted EBS volumes.
+        Args:
+            region_list (list): List of AWS regions to analyze.
+        """
         print("EBS: Analyzing Unecrypted volumes...")
 
         # Loop through Regions
@@ -40,8 +55,10 @@ class ebs_unencrypted_volumes_analyzer:
         self.csv()
 
     def csv(self):
-        # Write CSV
-        with open(f'unencrypted_volumes_{self.account_id}.csv', 'w', newline='') as csvfile:
+        """ 
+        Write CSV 
+        """
+        with open(f'unencrypted_volumes_{self.account_id}.csv', 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Account ID', 'Region', 'Volume ID', 'Encrypted',
                           'Type', 'Attached Instances', 'IOPS', 'Size']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

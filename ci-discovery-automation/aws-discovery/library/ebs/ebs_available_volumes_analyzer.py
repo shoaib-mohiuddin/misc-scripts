@@ -1,14 +1,29 @@
-import boto3
+"""
+EBS Available Volumes Analyzer
+
+This module analyzes EBS volumes in specified AWS regions to identify unattached volumes.
+It generates a CSV report with details about each unattached volume.
+"""
+
 import csv
+import boto3
 
 
-class ebs_available_volumes_analyzer:
+class EbsAvailableVolumesAnalyzer:
+    """
+    Analyzes EBS volumes to find unattached volumes.
+    """
 
     def __init__(self, account_id):
         self.account_id = account_id
         self.available_volumes = []
 
     def analyze(self, region_list):
+        """
+        Analyzes the specified regions for unattached EBS volumes.
+        Args:
+            region_list (list): List of AWS regions to analyze.
+        """
         print("EBS: Analyzing Unattached volumes...")
 
         # Loop through Regions
@@ -36,8 +51,10 @@ class ebs_available_volumes_analyzer:
         self.csv()
 
     def csv(self):
-        # Write CSV
-        with open(f'available_volumes_{self.account_id}.csv', 'w', newline='') as csvfile:
+        """
+        Write CSV
+        """
+        with open(f'available_volumes_{self.account_id}.csv', 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Account ID', 'Region', 'Volume ID',
                           'State', 'Type', 'IOPS', 'Size']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

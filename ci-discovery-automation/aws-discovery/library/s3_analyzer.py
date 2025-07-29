@@ -1,19 +1,22 @@
+"""
+S3 Analyzer
+
+This module analyzes S3 buckets in specified AWS regions to gather information about bucket size, item count, 
+encryption, versioning, lifecycle policies, replication, and public access status.
+It generates a CSV report with details about each bucket.
+"""
+
+import csv
+import datetime
 import boto3
 import botocore
-import datetime
-import csv
-
-# S3 Analyzer
-# Get total Items and Size of all buckets
-# Get Lifecycle Policies
-# Get Versioning
-# Get Encryption
-# Get Replication
-# Check if Buckets are public and flag it as red
 
 
 # Create S3 Class
-class S3_analyzer:
+class S3Analyzer:
+    """
+    Analyzes S3 buckets to gather information such as size, item count, encryption, versioning, lifecycle policies,
+    replication, and public access status."""
 
     def __init__(self, account_id):
         self.account_id = account_id
@@ -21,6 +24,11 @@ class S3_analyzer:
         self.all_buckets = []
 
     def analyze(self, mode='light'):
+        """
+        Analyzes the specified regions for S3 buckets.
+        Args:
+            mode (str): Mode of analysis, either 'light' for a quick scan(default) or 'full' for a deep analysis.
+        """
         print("S3: Analyzing...")
         if mode == 'light':
             self.light_scan()
@@ -30,6 +38,10 @@ class S3_analyzer:
             self.deep_csv()
 
     def light_scan(self):
+        """
+        Performs a light scan of S3 buckets to gather basic information such as size, item count, encryption, 
+        versioning, lifecycle policies, replication, and public access status.
+        """
         # Initialize AWS credentials and S3 client
         s3_client = boto3.client('s3')
 
@@ -187,9 +199,11 @@ class S3_analyzer:
                         'BucketPublic': bucket_public})
 
     def csv(self):
-        # Export CSV of bucket data
+        """
+        Export CSV of bucket data
+        """
 
-        with open(f's3_{self.account_id}.csv', 'w', newline='') as csvfile:
+        with open(f's3_{self.account_id}.csv', 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Account ID', 'Region', 'BucketName', 'BucketSize', 'BucketItems', 'BucketCost', 'BucketGlacier',
                           'BucketEncryption', 'BucketVersioning', 'BucketLifecycle', 'BucketReplication', 'BucketPublic']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -198,6 +212,12 @@ class S3_analyzer:
                 writer.writerow(bucket)
 
     def deep_analyze(self):
+        """
+        Deep Mode has a closer look at the bucket items and determines a more accurate cost of the bucket per item and 
+        storage tier, this does take longer and uses the S3 list object API, if a bucket has millions of items this 
+        could start to incur cost for clients as the API can only return 1000 items per list request. 
+        This is not the default run mode for this reason and should be used only as needed.
+        """
         # Initialize AWS credentials and S3 client
         s3_client = boto3.client('s3')
 
@@ -370,7 +390,9 @@ class S3_analyzer:
             "itemtotals": bucket_item_totals})
 
     def deep_csv(self):
-        # Generate CSV Data and export
+        """
+        Generate CSV Data and export
+        """
         print("Generating CSV Data")
         csv_data = []
         for bucket in self.all_buckets:
@@ -398,7 +420,7 @@ class S3_analyzer:
                 ]
             )
 
-        with open('s3.csv', 'w', newline='') as csvfile:
+        with open('s3.csv', 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow([
                 "Bucket",

@@ -1,15 +1,29 @@
-import boto3
-import datetime
+"""
+AMI Analyzer
+
+This module analyzes AMIs in specified AWS regions and generates a CSV report.
+"""
+
 import csv
+import datetime
+import boto3
 
 
-class ami_analyzer:
+class AmiAnalyzer:
+    """
+    Analyzes AMIs to find details about them, including encryption status, age, and cost.
+    """
 
     def __init__(self, account_id):
         self.account_id = account_id
         self.images = []
 
     def analyze(self, region_list):
+        """
+        Analyzes the specified regions for AMIs.
+        Args:
+            region_list (list): List of AWS regions to analyze.
+        """
         print("AMI: Analyzing...")
 
         # Loop through Regions
@@ -54,8 +68,10 @@ class ami_analyzer:
         self.csv()
 
     def csv(self):
-        # Write CSV
-        with open(f'ami_{self.account_id}.csv', 'w', newline='') as csvfile:
+        """
+        Write CSV
+        """
+        with open(f'ami_{self.account_id}.csv', 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Account ID', 'Region', 'Name', 'Description', 'Platform',
                           'ImageId', 'ImageCost', 'ImageAge', 'ImageEncryption']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

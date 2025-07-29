@@ -1,15 +1,29 @@
-import boto3
-import datetime
+"""
+EBS Snapshots Analyzer
+
+This module analyzes EBS snapshots in specified AWS regions and generates a CSV report
+with details about each snapshot, including its ID, size, age, storage tier, and encryption status.
+"""
+
 import csv
+import datetime
+import boto3
 
 
-class ebs_snapshots_analyzer:
+class EbsSnapshotsAnalyzer:
+    """
+    Analyzes EBS snapshots to gather information such as size, age, storage tier, and encryption status.
+    """
 
     def __init__(self, account_id):
         self.account_id = account_id
         self.snapshots = []
 
     def analyze(self, region_list):
+        """
+        Analyzes the specified regions for EBS snapshots.
+        Args:
+            region_list (list): List of AWS regions to analyze."""
         print("EBS: Analyzing...")
 
         # Loop through Regions
@@ -40,8 +54,10 @@ class ebs_snapshots_analyzer:
         self.csv()
 
     def csv(self):
-        # Write CSV
-        with open(f'ebs_snapshots_{self.account_id}.csv', 'w', newline='') as csvfile:
+        """
+        Write CSV
+        """
+        with open(f'ebs_snapshots_{self.account_id}.csv', 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Account ID', 'Region', 'SnapshotId', 'SnapshotSize',
                           'SnapshotCost ($)', 'SnapshotAge (Days)', 'StorageTier', 'SnapshotEncryption']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

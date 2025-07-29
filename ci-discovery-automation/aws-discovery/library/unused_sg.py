@@ -1,14 +1,29 @@
-import boto3
+"""
+Security Group Analyzer
+
+This module analyzes AWS security groups in specified regions to identify unused security groups.
+It generates a CSV report with details about each unused security group, its ID and region.
+"""
+
 import csv
+import boto3
 
 
-class sg_analyzer:
+class SecurityGroupAnalyzer:
+    """
+    Analyzes AWS security groups to find unused security groups.
+    """
 
     def __init__(self, account_id):
         self.account_id = account_id
         self.unused_sgs = []
 
     def analyze(self, region_list):
+        """
+        Analyzes the specified regions for unused security groups.
+        Args:
+            region_list (list): List of AWS regions to analyze.
+        """
         print("Analyzing Unused Security Groups...")
         # Loop through Regions
         for region in region_list:
@@ -37,8 +52,10 @@ class sg_analyzer:
         self.csv()
 
     def csv(self):
-        # Write CSV
-        with open(f'unused_sgs_{self.account_id}.csv', 'w', newline='') as csvfile:
+        """
+        Write CSV
+        """
+        with open(f'unused_sgs_{self.account_id}.csv', 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Account ID', 'Region', 'SGID']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()

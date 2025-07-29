@@ -1,14 +1,28 @@
-import boto3
+"""
+Classic Load Balancer Analyzer
+
+This module analyzes Classic Load Balancers in specified AWS regions and generates a CSV report.
+"""
+
 import csv
+import boto3
 
 
-class classic_elb_analyzer:
+class ClassicElbAnalyzer:
+    """
+    Analyzes Classic Load Balancers to find details about them.
+    """
 
     def __init__(self, account_id):
         self.account_id = account_id
         self.classic_lbs = []
 
     def analyze(self, region_list):
+        """
+        Analyzes the specified regions for Classic Load Balancers.
+        Args:
+            region_list (list): List of AWS regions to analyze.
+        """
         print("Analyzing Classic load balancers...")
 
         # Loop through Regions
@@ -32,8 +46,10 @@ class classic_elb_analyzer:
         self.csv()
 
     def csv(self):
-        # Write CSV
-        with open(f'classic_lbs_{self.account_id}.csv', 'w', newline='') as csvfile:
+        """
+        Write CSV
+        """
+        with open(f'classic_lbs_{self.account_id}.csv', 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Account ID', 'Region', 'Load Balancer Name',
                           'Type', 'DNS Name', 'VPC']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

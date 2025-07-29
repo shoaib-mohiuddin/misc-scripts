@@ -1,14 +1,29 @@
-import boto3
+"""
+EBS GP2 Analyzer
+
+This module analyzes EBS GP2 volumes in specified AWS regions and generates a CSV report
+with details about each GP2 volume, including its ID, size, IOPS, and attached instances.
+"""
+
 import csv
+import boto3
 
 
-class ebs_gp2_analyzer:
+class EbsGp2Analyzer:
+    """
+    Analyzes EBS volumes to find GP2 volumes.
+    """
 
     def __init__(self, account_id):
         self.account_id = account_id
         self.gp2_volumes = []
 
     def analyze(self, region_list):
+        """
+        Analyzes the specified regions for GP2 EBS volumes.
+        Args:
+            region_list (list): List of AWS regions to analyze.
+        """
         print("EBS: Analyzing GP2 volumes...")
 
         # Loop through Regions
@@ -40,8 +55,10 @@ class ebs_gp2_analyzer:
         self.csv()
 
     def csv(self):
-        # Write CSV
-        with open(f'ebs_gp2_volumes_{self.account_id}.csv', 'w', newline='') as csvfile:
+        """
+        Write CSV
+        """
+        with open(f'ebs_gp2_volumes_{self.account_id}.csv', 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Account ID', 'Region', 'Volume ID', 'Type',
                           'Size', 'IOPS', 'Attached Instances']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
