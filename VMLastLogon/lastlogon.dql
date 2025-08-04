@@ -1,0 +1,124 @@
+///////// Initial test queries for a particular host/VM
+// 1.
+fetch logs
+| filter dt.entity.host == "HOST-A9A521853EBE8D21"
+| filter log.source == "Windows Security Log"
+| sort timestamp desc
+
+// 2.
+fetch logs
+| filter dt.entity.host == "HOST-A9A521853EBE8D21"
+| filter log.source == "Windows Security Log"
+| filter contains(content, "An account was successfully logged on")
+| sort timestamp desc
+
+//////// Filters for network login types
+// 1.
+fetch logs
+| filter dt.entity.host == "HOST-A9A521853EBE8D21"
+| filter log.source == "Windows Security Log"
+| filter contains(content, "Logon Type:\t\t10")
+| filter contains(content, "S-1-5-21-")  // Domain user SID pattern
+| sort timestamp desc
+
+// 2.
+fetch logs
+| filter dt.entity.host == "HOST-A9A521853EBE8D21"
+| filter log.source == "Windows Security Log"
+| filter contains(content, "Logon Type:\t\t10")
+| filter contains(content, "New Logon:")
+| filter contains(content, "S-1-5-21-")
+| sort timestamp desc
+| fields timestamp, content
+
+// 3. Gives the count
+fetch logs
+| filter dt.entity.host == "HOST-A9A521853EBE8D21"
+| filter log.source == "Windows Security Log"
+| filter contains(content, "Logon Type:\t\t10")
+| filter contains(content, "New Logon:")
+| filter contains(content, "S-1-5-21-")
+| summarize count()
+
+
+/////// Also possible with filter for EventID
+// 1.
+fetch logs
+| filter dt.entity.host == "HOST-A9A521853EBE8D21"
+| filter winlog.eventid == "4624"
+| filter contains(content, "Logon Type:\t\t10")
+
+////// More apt ones
+// 1.
+fetch logs
+| filter dt.entity.host == "HOST-A9A521853EBE8D21"
+| filter log.source == "Windows Security Log"
+| filter contains(content, "Logon Type:\t\t10")
+| filter contains(content, "S-1-5-21-")
+| fieldsAdd computer_name = dt.entity.host
+| fieldsAdd new_logon_start = indexOf(content, "New Logon:")
+| fieldsAdd account_name_start = indexOf(content, "Account Name:\t\t", from: new_logon_start) + 15
+| fieldsAdd account_name_end = indexOf(content, "\n", from: account_name_start)
+| fieldsAdd account_domain_start = indexOf(content, "Account Domain:\t\t", from: new_logon_start) + 17
+| fieldsAdd account_domain_end = indexOf(content, "\n", from: account_domain_start)
+| fieldsAdd account_user = substring(content, from: account_name_start, to: account_name_end)
+| fieldsAdd account_domain = substring(content, from: account_domain_start, to: account_domain_end)
+| sort timestamp desc
+| fields timestamp, computer_name, account_domain, account_user
+
+// 2. 
+fetch logs
+| filter dt.entity.host == "HOST-A9A521853EBE8D21"
+| filter log.source == "Windows Security Log"
+| filter contains(content, "Logon Type:\t\t10")
+| filter contains(content, "S-1-5-21-")
+| fieldsAdd computer_name = dt.entity.host
+| fieldsAdd new_logon_start = indexOf(content, "New Logon:")
+| fieldsAdd account_user = substring(content, from: indexOf(content, "Account Name:\t\t", from: new_logon_start) + 15, to: indexOf(content, "Account Name:\t\t", from: new_logon_start) + 25)
+| fieldsAdd account_domain = substring(content, from: indexOf(content, "Account Domain:\t\t", from: new_logon_start) + 17, to: indexOf(content, "Account Domain:\t\t", from: new_logon_start) + 25)
+| sort timestamp desc
+| fields timestamp, computer_name, account_domain, account_user
+
+
+////// With actual VM names for all VMs
+fetch logs
+| filter log.source == "Windows Security Log"
+| filter contains(content, "Logon Type:\t\t10")
+| filter contains(content, "S-1-5-21-")
+| fieldsAdd computer_name = host.name
+| fieldsAdd new_logon_start = indexOf(content, "New Logon:")
+| fieldsAdd account_user = substring(content, from: indexOf(content, "Account Name:\t\t", from: new_logon_start) + 15, to: indexOf(content, "Account Name:\t\t", from: new_logon_start) + 25)
+| fieldsAdd account_domain = substring(content, from: indexOf(content, "Account Domain:\t\t", from: new_logon_start) + 17, to: indexOf(content, "Account Domain:\t\t", from: new_logon_start) + 25)
+| sort timestamp desc
+| dedup computer_name
+| fields timestamp, computer_name, account_domain, account_user
+
+
+////// Test query
+fetch logs
+| filter winlog.eventid == "4624"
+| filter contains(content, "Logon Type:\t\t10")
+| filter contains(content, "S-1-5-21-")  // Domain user SID pattern
+| dedup host.name
+
+////// FINAL ONE WITH TAGS
+fetch logs
+| filter log.source == "Windows Security Log"
+| filter contains(content, "Logon Type:\t\t10")
+| filter contains(content, "S-1-5-21-")
+| fieldsAdd computer_name = host.name
+| fieldsAdd new_logon_start = indexOf(content, "New Logon:")
+| fieldsAdd account_user = substring(content, from: indexOf(content, "Account Name:\t\t", from: new_logon_start) + 15, to: indexOf(content, "Account Name:\t\t", from: new_logon_start) + 25)
+| fieldsAdd account_domain = substring(content, from: indexOf(content, "Account Domain:\t\t", from: new_logon_start) + 17, to: indexOf(content, "Account Domain:\t\t", from: new_logon_start) + 25)
+| sort timestamp desc
+| dedup computer_name
+| fieldsAdd tags = lookup([
+   fetch dt.entity.azure_vm, from: -24h | fieldsAdd tags | fieldsRemove id
+   ],
+   sourceField: computer_name,
+   lookupField: entity.name)
+| parse tostring(tags), "ld:key1 '[Azure]Environment:' ld:Environment '\"'"
+| parse tostring(tags), "ld:key3 '[Azure]Division:' ld:Division '\"'"
+| fieldsAdd Environment = if(IsNull(Environment), "Not configured", else: Environment)
+| fieldsAdd Division = if(IsNull(Division), "Not configured", else: Division)
+| fields timestamp, computer_name, account_domain, account_user, Environment, Division
