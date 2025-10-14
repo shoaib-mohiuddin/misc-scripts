@@ -15,6 +15,7 @@ from library.unused_sg import SecurityGroupAnalyzer
 from library.classic_elb_analyzer import ClassicElbAnalyzer
 from library.iam_access_keys_analyzer import IamAccessKeyAnalyzer
 from library.ec2_overprovisioned_analyzer import Ec2OverprovisionedAnalyzer
+from library.unused_elastic_ip import ElasticIPAnalyzer
 
 # Specifiy default region
 regions = [
@@ -41,42 +42,46 @@ print("Analyzing for these regions:\n", regions)
 
 # AMI Analyzer
 # Creates csv report showing region, age, encryption, and monthly cost
-ami = AmiAnalyzer(account_id)
-ami.analyze(regions)
+# ami = AmiAnalyzer(account_id)
+# ami.analyze(regions)
 
-# Creates csv report showing Region, Size, Encryption, age and monthly cost
-ebs_snapshots = EbsSnapshotsAnalyzer(account_id)
-ebs_snapshots.analyze(regions)
+# # Creates csv report showing Region, Size, Encryption, age and monthly cost
+# ebs_snapshots = EbsSnapshotsAnalyzer(account_id)
+# ebs_snapshots.analyze(regions)
 
-# Creates csv report for listing GP2 Volumes with required fields
-ebs_gp2_volumes = EbsGp2Analyzer(account_id)
-ebs_gp2_volumes.analyze(regions)
+# # Creates csv report for listing GP2 Volumes with required fields
+# ebs_gp2_volumes = EbsGp2Analyzer(account_id)
+# ebs_gp2_volumes.analyze(regions)
 
-# Creates csv report for listing Unattached Volumes with required fields
-ebs_available_volumes = EbsAvailableVolumesAnalyzer(account_id)
-ebs_available_volumes.analyze(regions)
+# # Creates csv report for listing Unattached Volumes with required fields
+# ebs_available_volumes = EbsAvailableVolumesAnalyzer(account_id)
+# ebs_available_volumes.analyze(regions)
 
-# Creates csv report for listing Unencrypted Volumes with required fields
-ebs_unecrypted_volumes = EbsUnencryptedVolumesAnalyzer(account_id)
-ebs_unecrypted_volumes.analyze(regions)
+# # Creates csv report for listing Unencrypted Volumes with required fields
+# ebs_unecrypted_volumes = EbsUnencryptedVolumesAnalyzer(account_id)
+# ebs_unecrypted_volumes.analyze(regions)
 
-# Creates report showing Region, Size, Number of Objects, Potential Costs, Lifecycle Policys, Replication Policies
-# Exports: CSV, HTML
-s3 = S3Analyzer(account_id)
-s3.analyze()
+# # Creates report showing Region, Size, Number of Objects, Potential Costs, Lifecycle Policys, Replication Policies
+# # Exports: CSV, HTML
+# s3 = S3Analyzer(account_id)
+# s3.analyze()
 
-# Creates csv report for listing Unused Security Groups
-unused_groups = SecurityGroupAnalyzer(account_id)
-unused_groups.analyze(regions)
+# # Creates csv report for listing Unused Security Groups
+# unused_groups = SecurityGroupAnalyzer(account_id)
+# unused_groups.analyze(regions)
 
-# Creates csv report for listing Classic Load Balancers with required fields
-classic_lbs = ClassicElbAnalyzer(account_id)
-classic_lbs.analyze(regions)
+# # Creates csv report for listing Classic Load Balancers with required fields
+# classic_lbs = ClassicElbAnalyzer(account_id)
+# classic_lbs.analyze(regions)
 
-# Creates csv report for listing list of IAM users with access keys older than 90 days
-old_access_keys = IamAccessKeyAnalyzer(account_id)
-old_access_keys.analyze()
+# # Creates csv report for listing list of IAM users with access keys older than 90 days
+# old_access_keys = IamAccessKeyAnalyzer(account_id)
+# old_access_keys.analyze()
 
-# Creates csv report for listing overprovisioned EC2 instances using Compute Optimizer
-overprovisioned_instances = Ec2OverprovisionedAnalyzer(account_id)
-overprovisioned_instances.analyze(regions)
+# # Creates csv report for listing overprovisioned EC2 instances using Compute Optimizer
+# overprovisioned_instances = Ec2OverprovisionedAnalyzer(account_id)
+# overprovisioned_instances.analyze(regions)
+
+# Creates csv report for listing unused Elastic IPs
+unused_elastic_ips = ElasticIPAnalyzer(account_id)
+unused_elastic_ips.analyze(regions)

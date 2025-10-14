@@ -1,0 +1,8 @@
+SubscriptionName,ResourceGroup,StorageAccount,PreviousTLS,NewTLS,Status,ErrorMessage,Timestamp
+Connectivity sub,rg-cr-test-ue,straccprodne03,TLS1_0,TLS1_2,Success,,Tue Oct 14 20:41:14 IST 2025
+Connectivity sub,rg-cr-test-ue,strblobcontnonprodue01,TLS1_1,TLS1_2,Success,,Tue Oct 14 20:41:21 IST 2025
+Connectivity sub,rg-cr-test-ue,strgdataplatfornstgwe01,TLS1_1,TLS1_2,Success,,Tue Oct 14 20:41:28 IST 2025
+Management sub1,rg-cr-preprod-we,dldppsynagw01,TLS1_0,TLS1_2,Success,,Tue Oct 14 20:41:38 IST 2025
+Management sub1,rg-cr-preprod-we,stgappsdrtestne01diag,TLS1_0,TLS1_2,Success,,Tue Oct 14 20:41:46 IST 2025
+Management sub1,rg-cr-preprod-we,fsxappsdrprodea01diag,TLS1_0,TLS1_2,Success,,Tue Oct 14 20:41:55 IST 2025
+LandingZone1 sub,rg-cr-lz-prod-ae,strlzprodae01diag01,TLS1_1,TLS1_2,Success,,Tue Oct 14 20:42:04 IST 2025

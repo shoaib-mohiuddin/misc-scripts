@@ -1,0 +1,8 @@
+﻿subscription,resourceGroup,location,resourceName,storageAccount,subscriptionName
+05d41fe3-b643-4403-9560-95a972b13fee,rg-cr-test-ue,northeurope,/subscriptions/05d41fe3-b643-4403-9560-95a972b13fee/resourceGroups/rg-cr-test-ue/providers/Microsoft.Storage/storageAccounts/straccprodne03,straccprodne03,Connectivity sub
+05d41fe3-b643-4403-9560-95a972b13fee,rg-cr-test-ue,eastus,/subscriptions/05d41fe3-b643-4403-9560-95a972b13fee/resourceGroups/rg-cr-test-ue/providers/Microsoft.Storage/storageAccounts/strblobcontnonprodue01,strblobcontnonprodue01,Connectivity sub
+05d41fe3-b643-4403-9560-95a972b13fee,rg-cr-test-ue,westeurope,/subscriptions/05d41fe3-b643-4403-9560-95a972b13fee/resourceGroups/rg-cr-test-ue/providers/Microsoft.Storage/storageAccounts/strgdataplatfornstgwe01,strgdataplatfornstgwe01,Connectivity sub
+b27a5768-7a58-4fc1-af6c-3a19e9f0d3a7,rg-cr-preprod-we,westeurope,/subscriptions/b27a5768-7a58-4fc1-af6c-3a19e9f0d3a7/resourceGroups/rg-cr-preprod-we/providers/Microsoft.Storage/storageAccounts/dldppsynagw01,dldppsynagw01,Management sub1
+b27a5768-7a58-4fc1-af6c-3a19e9f0d3a7,rg-cr-preprod-we,northeurope,/subscriptions/b27a5768-7a58-4fc1-af6c-3a19e9f0d3a7/resourceGroups/rg-cr-preprod-we/providers/Microsoft.Storage/storageAccounts/stgappsdrtestne01diag,stgappsdrtestne01diag,Management sub1
+b27a5768-7a58-4fc1-af6c-3a19e9f0d3a7,rg-cr-preprod-we,eastasia,,fsxappsdrprodea01diag,Management sub1
+845bb11d-cc1b-4fad-9985-9f5ba9ea1f49,rg-cr-lz-prod-ae,australiaeast,,strlzprodae01diag01,LandingZone1 sub
