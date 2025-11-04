@@ -153,7 +153,7 @@ if ($subscriptionNames -contains $subscriptionName) {
   foreach ($routeTableid in $routeTableids) {
     $RouteTableObj = Get-AzRouteTable -Name $routeTableid.split("/")[-1]
 
-    if (($RouteTableObj.Name -notlike "*-PALO-*") -and ($RouteTableObj.Name -notlike "RT-PROD-GW-*")) {
+    if (($RouteTableObj.Name -notlike "*-PALO-*") -and ($RouteTableObj.Name -notlike "RT-PROD-GW-*") -and ($RouteTableObj.Tag["RouteTableManager"] -ne "OutOfScope")) {
       Write-Output "Validating route table $($RouteTableObj.Name) ..."
       switch -Wildcard ($RouteTableObj.location) {
         "NorthEurope" {
@@ -229,7 +229,7 @@ if ($subscriptionNames -contains $subscriptionName) {
               # $_.NextHopIpAddress -eq $null
             }
           }
-          if ($dbRoute.Name -like "*-PALO-CLIENT-VPN-POOL-*") {
+          if ($dbRoute.Name -like "*-PALO-CLIENT-VPN*") {
             $match = $currentRoutes | Where-Object {
               $_.Name -eq $dbRoute.Name -and
               $_.AddressPrefix -eq $dbRoute.AddressPrefix -and
@@ -237,7 +237,7 @@ if ($subscriptionNames -contains $subscriptionName) {
               $_.NextHopIpAddress -eq $dbRoute.NetxtHopIP
             }
           }
-          if (($dbRoute.Name -notlike "PA-P-FW-*") -and ($dbRoute.Name -notlike "*-PALO-MAN-*") -and ($dbRoute.Name -notlike "*-PALO-CLIENT-VPN-POOL-*")) {                                               #All other routes
+          if (($dbRoute.Name -notlike "PA-P-FW-*") -and ($dbRoute.Name -notlike "*-PALO-MAN-*") -and ($dbRoute.Name -notlike "*-PALO-CLIENT-VPN*")) {                                               #All other routes
             $match = $currentRoutes | Where-Object {
               ($_.Name -eq $dbRoute.Name -or
               $_.AddressPrefix -eq $dbRoute.AddressPrefix) -and
@@ -269,51 +269,59 @@ if ($subscriptionNames -contains $subscriptionName) {
   }
 
   ## SECTION IV - GENERATE CSV AND SEND EMAIL
+  if ($RT_Report) {
+    $date = Get-Date -format "dd/MM/yyyy"
+    Write-Output "Route Table Compliance Report:" 
+    $RT_Report | Format-Table -AutoSize
+    Write-Output "RT_Report Count: $($RT_Report.Count)"
 
-  $date = Get-Date -format "dd/MM/yyyy"
-  Write-Output "Route Table Compliance Report:" 
-  $RT_Report | Format-Table -AutoSize
-  Write-Output "RT_Report Count: $($RT_Report.Count)"
+    # Convert report to CSV
+    $csvFilePath = ".\RouteTableComplianceReport.csv"
+    $RT_Report | Export-Csv -Path $csvFilePath -NoTypeInformation
+    $file_bytes = [System.IO.File]::ReadAllBytes($csvFilePath)
 
-  # Convert report to CSV
-  $csvFilePath = ".\RouteTableComplianceReport.csv"
-  $RT_Report | Export-Csv -Path $csvFilePath -NoTypeInformation
-  $file_bytes = [System.IO.File]::ReadAllBytes($csvFilePath)
+    $subject = "Route Table Compliance Report - $date - $subscriptionName"
+    $emailFrom = "AzureAutomation@service.howdengrp.com"
+    $emailTo = "shoaib.mohiuddin@cloudreach.com"
+    $toName = "CloudreachSupport"
+    $endpoint = "https://autoacc-prod-it-ops-comm-service.europe.communication.azure.com/"
 
-  $subject = "Route Table Compliance Report - $date - $subscriptionName"
-  $emailFrom = "AzureAutomation@service.howdengrp.com"
-  $emailTo = "shoaib.mohiuddin@cloudreach.com"
-  $toName = "CloudreachSupport"
-  $endpoint = "https://autoacc-prod-it-ops-comm-service.europe.communication.azure.com/"
+    $emailRecipientTo = @(
+      @{
+        Address = $emailTo
+        DisplayName = $toName
+      }
+    )
 
-  $emailRecipientTo = @(
-    @{
-      Address = $emailTo
-      DisplayName = $toName
+    $emailAttachment = @(
+      @{
+        ContentInBase64 = $file_bytes
+        ContentType = "text/csv"
+        Name = "RouteTableComplianceReport-$date-$subscriptionName.csv"
+      }
+    )
+    $message = @{
+      ContentSubject = $subject
+      RecipientTo = @($emailRecipientTo)
+      SenderAddress = $emailFrom
+      ContentHtml = "<html><body><p>Please find the attached Route Table Compliance Report.</p><p>Please refer to the document linked below to take appropriate action based on the report findings:</p><p><a href='https://cloudreach.jira.com/wiki/spaces/CO/pages/5408751617/Action+on+Compliance+Report+Not+live+yet'>Action on Compliance Report</a></p></body></html>"
+      Attachment = @($emailAttachment)
     }
-  )
 
-  $emailAttachment = @(
-    @{
-      ContentInBase64 = $file_bytes
-      ContentType = "text/csv"
-      Name = "RouteTableComplianceReport-$date-$subscriptionName.csv"
+    try {
+      $poller = Send-AzEmailServicedataEmail -Message $Message -endpoint $endpoint # It should be $Message and not $message as with latter it is failing
+      $result = $poller.Result
+      if ($result) {}
+      Write-Output "Email sent."
+    } catch {
+      Write-Error "Error sending email: $_"
     }
-  )
-  $message = @{
-    ContentSubject = $subject
-    RecipientTo = @($emailRecipientTo)
-    SenderAddress = $emailFrom
-    ContentHtml = "<html><body><p>Please find the attached Route Table Compliance Report.</p><p>Please refer to the document linked below to take appropriate action based on the report findings:</p><p><a href='https://cloudreach.jira.com/wiki/spaces/CO/pages/5408751617/Action+on+Compliance+Report+Not+live+yet'>Action on Compliance Report</a></p></body></html>"
-    Attachment = @($emailAttachment)
   }
-
-  try {
-    $poller = Send-AzEmailServicedataEmail -Message $Message -endpoint $endpoint # It should be $Message and not $message as with latter it is failing
-    $result = $poller.Result
-    Write-Output "Email sent."
-  } catch {
-    Write-Error "Error sending email: $_"
+  else {
+    Write-Output "=============================================================="
+    Write-Output "No missing/incorrect routes found in any route table."
+    Write-Output "All route tables are compliant."
+    Write-Output "=============================================================="
   }
 } 
 else {
