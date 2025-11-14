@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Input file from the enforcement script
-input_file="tls_enforcement_results.csv"
+input_file="tls_enforcement_results_sanonprod.csv"
 
 # Output file for rollback results
-output_file="tls_rollback_results.csv"
+output_file="tls_rollback_results_sanonprod.csv"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-input_file="export_data (1).csv"
+input_file="storageaccounts_nonprod.csv"
 
-output_file="tls_enforcement_results.csv"
+output_file="tls_enforcement_results_sanonprod.csv"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -13,7 +13,7 @@ echo "SubscriptionName,ResourceGroup,StorageAccount,PreviousTLS,NewTLS,Status,Er
 
 current_subscription=""
 
-while IFS=',' read -r subscription resourceGroup location resourceName storageAccount subscriptionName
+while IFS=',' read -r subscription resourceGroup location storageAccount subscriptionName Division Department ServiceName Environment
 do
     # Remove quotes, newlines, carriage returns, and trim whitespace
     subscription=$(echo "$subscription" | tr -d '"\r\n' | xargs)
